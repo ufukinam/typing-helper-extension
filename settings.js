@@ -1,6 +1,7 @@
 const allowedInput = document.getElementById('allowedInput');
 const addAllowedBtn = document.getElementById('addAllowedBtn');
 const allowedList = document.getElementById('allowedList');
+const triggerCharacter = document.getElementById('triggerCharacter') || '#';
 
 const normalize = str => str.toLocaleLowerCase('tr-TR');
 
@@ -85,20 +86,39 @@ allowedInput.addEventListener('keydown', (e) => {
 document.getElementById('addShortcutBtn').onclick = () => {
   const keyInput = document.getElementById('shortcutKey');
   const valueInput = document.getElementById('shortcutValue');
+  const triggerCharacter = document.getElementById('triggerCharacter').value;
   const key = normalize(keyInput.value);
   const value = valueInput.value.trim();
-  if (!key.startsWith('#') || !value) return;
+  
+  //if (!key.startsWith(triggerCharacter.value) || !value) return;
 
   chrome.storage.sync.get(['shortcuts'], (res) => {
     const shortcuts = res.shortcuts || {};
     if (!shortcuts[key]) {
-      shortcuts[key] = value;
+      shortcuts[triggerCharacter + key] = value;
       chrome.storage.sync.set({ shortcuts }, () => renderShortcuts(shortcuts));
     }
     keyInput.value = '';
     valueInput.value = '';
   });
 };
+
+document.getElementById('clearDataBtn').onclick = () => {
+  chrome.storage.sync.clear(() => {
+    renderAllowedSites([]);
+    renderShortcuts({});
+  });
+};
+
+// Save
+document.getElementById('triggerCharacter').addEventListener('input', (e) => {
+  chrome.storage.sync.set({ triggerCharacter: e.target.value });
+});
+
+// Load
+chrome.storage.sync.get('triggerCharacter', (result) => {
+  document.getElementById('triggerCharacter').value = result.triggerCharacter || '#';
+});
 
 // Initial render
 chrome.storage.sync.get(['allowedSites', 'shortcuts'], (result) => {

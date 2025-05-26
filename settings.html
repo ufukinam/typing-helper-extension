@@ -89,13 +89,6 @@
       background-color: #a71d2a;
     }
 
-    .shortcut-group {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
     .column-group {
       display: flex;
       flex-direction: column;
@@ -117,14 +110,23 @@
   </div>
   <ul id="allowedList"></ul>
 
-  <div class="section">
+  <div class="input-group column-group">
     <h2>Kısayollar (Keyword → Cümle)</h2>
     <div class="input-group column-group">
-      <input type="text" id="shortcutKey" placeholder="#anahtar">
+      <input type="text" id="shortcutKey" placeholder="anahtar">
       <textarea id="shortcutValue" rows="2" placeholder="Eklemek istediğiniz metni girin."></textarea>
       <button id="addShortcutBtn">Ekle</button>
     </div>
     <ul id="shortcutList"></ul>
+  </div>
+  <div class="input-group">
+      <h3>Kısayol karakteri:</h3>
+      <input type="text" id="triggerCharacter" maxlength="1">
+  </div>  
+
+  <div class="input-group" style="margin-top: 20px;">
+    <h3>Tüm Verileri Temizle</h3>
+    <button id="clearDataBtn" style="background-color: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Temizle</button>
   </div>
 
   <script src="settings.js"></script>

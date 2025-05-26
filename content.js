@@ -162,10 +162,169 @@ function activateAutocomplete () {
     });
   }
 
+  function createOverlayForEditable(el) {
+    if (el.dataset.hasHintOverlay) return;
+    el.dataset.hasHintOverlay = 'true';
+  
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'relative';
+    wrapper.style.display = 'inline-block';
+    wrapper.style.width = el.offsetWidth + 'px';
+    wrapper.style.height = el.offsetHeight + 'px';
+  
+    const ghost = document.createElement('div');
+    ghost.className = 'autocomplete-ghost';
+    ghost.style.position = 'absolute';
+    ghost.style.top = '0';
+    ghost.style.left = '0';
+    ghost.style.zIndex = '0';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.color = 'rgba(0, 0, 0, 0.3)';
+    ghost.style.whiteSpace = 'pre-wrap';
+    ghost.style.wordBreak = 'break-word';
+  
+    const style = getComputedStyle(el);
+    ghost.style.font = style.font;
+    ghost.style.padding = style.padding;
+    ghost.style.margin = style.margin;
+    ghost.style.border = style.border;
+    ghost.style.lineHeight = style.lineHeight;
+    ghost.style.width = style.width;
+    ghost.style.height = style.height;
+  
+    // Make ghost text semi-transparent
+    const originalColor = style.color;
+    const rgb = originalColor.match(/\d+/g);
+    if (rgb) {
+      ghost.style.color = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.3)`;
+    }
+
+    el.style.position = 'relative';
+    el.style.zIndex = '1';
+    el.style.backgroundColor = 'transparent';
+  
+    el.parentNode.insertBefore(wrapper, el);
+    wrapper.appendChild(ghost);
+    wrapper.appendChild(el);
+  
+    el.addEventListener('input', () => {
+      const value = el.innerText;
+      if (!value.trim()) {
+        ghost.innerText = '';
+        suggestion = '';
+        return;
+      }
+  
+      const words = value.split(/\s+/);
+      const lastWord = words[words.length - 1];
+      const normalizedWord = normalize(lastWord);
+
+      //if (!lastWord.startsWith(triggerCharacter)) return;
+
+      //const keyword = normalize(lastWord.slice(triggerCharacter.length));
+
+      for (const [key, fullText] of Object.entries(shortcuts)) {
+        if (normalize(key) === normalizedWord) {
+          words[words.length - 1] = fullText;
+          const newText = words.join(' ');
+          el.innerText = newText;
+          placeCaretAtEnd(el);
+          ghost.innerText = '';
+          suggestion = '';
+          el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+          return;
+        }
+      }
+  
+      const match = sentences.find(s => normalize(s).startsWith(normalize(value)));
+      if (match && normalize(match) !== normalize(value)) {
+        ghost.innerText = match;
+        suggestion = match;
+      } else {
+        ghost.innerText = '';
+        suggestion = '';
+      }
+    });
+  
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' && suggestion) {
+        e.preventDefault();
+        const value = el.innerText;
+        const completion = suggestion.slice(value.length);
+        insertTextAtCursor(completion);
+        suggestion = '';
+        ghost.innerText = '';
+      }
+    });
+  
+    el.addEventListener('blur', () => {
+      ghost.innerText = '';
+      suggestion = '';
+    });
+  }
+  
+  // Helper: insert text at caret
+  function insertTextAtCursor(text) {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+  
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+  
+    const textNode = document.createTextNode(text);
+    range.insertNode(textNode);
+  
+    // Move caret after inserted text
+    range.setStartAfter(textNode);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  
+    // Dispatch input event to notify changes
+    const activeEl = sel.anchorNode?.parentElement;
+    if (activeEl && activeEl.isContentEditable) {
+      activeEl.dispatchEvent(new InputEvent('input', {
+        inputType: 'insertText',
+        data: text,
+        bubbles: true,
+        cancelable: true
+      }));
+    }
+  }
+  
+  // Helper: place caret at end of contenteditable
+  function placeCaretAtEnd(el) {
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  
   document.addEventListener('focusin', (e) => {
     const el = e.target;
-    if ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && !el.readOnly && !el.disabled) {
-      createOverlay(el);
+  
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+      if (!el.readOnly && !el.disabled) {
+        createOverlay(el);
+      }
+    } else if (el.isContentEditable) {
+      createOverlayForEditable(el);
+  
+      // Ensure keydown is directly attached
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab' && suggestion) {
+          e.preventDefault();
+          const value = el.innerText;
+          const completion = suggestion.slice(value.length);
+          insertTextAtCursor(completion);
+          suggestion = '';
+          const ghost = el.parentNode.querySelector('.autocomplete-ghost');
+          if (ghost) ghost.innerText = '';
+        }
+      });
     }
-  });
+  }); 
 }
