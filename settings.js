@@ -2,6 +2,8 @@ const allowedInput = document.getElementById('allowedInput');
 const addAllowedBtn = document.getElementById('addAllowedBtn');
 const allowedList = document.getElementById('allowedList');
 
+const normalize = str => str.toLocaleLowerCase('tr-TR');
+
 // Normalize domain: remove protocols, www, trailing slashes, paths, etc.
 function normalizeDomain(input) {
   try {
@@ -34,6 +36,24 @@ function renderAllowedSites(sites) {
   });
 }
 
+function renderShortcuts(shortcuts) {
+  const list = document.getElementById('shortcutList');
+  list.innerHTML = '';
+  for (const [key, value] of Object.entries(shortcuts)) {
+    const li = document.createElement('li');
+    li.textContent = `${key} → ${value}`;
+    const del = document.createElement('button');
+    del.textContent = 'X';
+    del.className = 'remove-btn';
+    del.onclick = () => {
+      delete shortcuts[key];
+      chrome.storage.sync.set({ shortcuts }, () => renderShortcuts(shortcuts));
+    };
+    li.appendChild(del);
+    list.appendChild(li);
+  }
+}
+
 addAllowedBtn.addEventListener('click', () => {
   let newSite = normalizeDomain(allowedInput.value);
   if (!newSite) return;
@@ -62,7 +82,26 @@ allowedInput.addEventListener('keydown', (e) => {
   }
 });
 
+document.getElementById('addShortcutBtn').onclick = () => {
+  const keyInput = document.getElementById('shortcutKey');
+  const valueInput = document.getElementById('shortcutValue');
+  const key = normalize(keyInput.value);
+  const value = valueInput.value.trim();
+  if (!key.startsWith('#') || !value) return;
+
+  chrome.storage.sync.get(['shortcuts'], (res) => {
+    const shortcuts = res.shortcuts || {};
+    if (!shortcuts[key]) {
+      shortcuts[key] = value;
+      chrome.storage.sync.set({ shortcuts }, () => renderShortcuts(shortcuts));
+    }
+    keyInput.value = '';
+    valueInput.value = '';
+  });
+};
+
 // Initial render
-chrome.storage.sync.get(['allowedSites'], (result) => {
+chrome.storage.sync.get(['allowedSites', 'shortcuts'], (result) => {
   renderAllowedSites(result.allowedSites || []);
+  renderShortcuts(result.shortcuts || {});
 });
