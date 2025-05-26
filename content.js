@@ -39,27 +39,18 @@ function activateAutocomplete () {
 
     const isTextarea = input.tagName === 'TEXTAREA';
 
-    const wrapper = document.createElement('div');
-    wrapper.style.position = 'relative';
-    wrapper.style.display = getComputedStyle(input).display === 'block' ? 'block' : 'inline-block';
-    wrapper.style.width = input.offsetWidth + 'px';
-    wrapper.style.height = input.offsetHeight + 'px';
-
+    // Create ghost overlay as a sibling, not by wrapping
     const ghost = document.createElement(isTextarea ? 'textarea' : 'input');
     ghost.disabled = true;
     ghost.className = 'autocomplete-ghost';
     ghost.style.position = 'absolute';
-    ghost.style.top = '0';
-    ghost.style.left = '0';
-    ghost.style.zIndex = '0';
+    ghost.style.zIndex = '9999';
     ghost.style.pointerEvents = 'none';
     ghost.style.color = '#aaa';
     ghost.style.background = 'transparent';
     ghost.style.borderColor = 'transparent';
     ghost.style.resize = 'none';
     ghost.style.overflow = 'hidden';
-    ghost.style.width = '100%';
-    ghost.style.height = '100%';
 
     cloneInputStyles(input, ghost);
 
@@ -70,15 +61,41 @@ function activateAutocomplete () {
       ghost.style.color = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.3)`;
     }
 
+    // Insert ghost as sibling, before input
+    input.parentNode.insertBefore(ghost, input);
     input.style.position = 'relative';
-    input.style.zIndex = '1';
+    input.style.zIndex = '10000';
     input.style.backgroundColor = 'transparent';
+    input.style.background = 'transparent';
 
-    input.parentNode.insertBefore(wrapper, input);
-    wrapper.appendChild(ghost);
-    wrapper.appendChild(input);
+    // Positioning: ensure parent is relative
+    const parent = input.parentNode;
+    if (parent && getComputedStyle(parent).position === 'static') {
+      parent.style.position = 'relative';
+    }
+
+    function updateGhostPosition() {
+      const rect = input.getBoundingClientRect();
+      const parentRect = parent.getBoundingClientRect();
+      ghost.style.top = (rect.top - parentRect.top + parent.scrollTop) + 'px';
+      ghost.style.left = (rect.left - parentRect.left + parent.scrollLeft) + 'px';
+      ghost.style.width = rect.width + 'px';
+      ghost.style.height = rect.height + 'px';
+    }
+    updateGhostPosition();
+    window.addEventListener('scroll', updateGhostPosition, true);
+    window.addEventListener('resize', updateGhostPosition);
+
+    // Remove ghost on blur or DOM removal
+    function cleanupGhost() {
+      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      window.removeEventListener('scroll', updateGhostPosition, true);
+      window.removeEventListener('resize', updateGhostPosition);
+      suggestion = '';
+    }
 
     input.addEventListener('input', () => {
+      updateGhostPosition();
       const value = input.value;
       if (!value.trim()) {
         ghost.value = '';
@@ -156,9 +173,23 @@ function activateAutocomplete () {
       }
     });
 
+    input.addEventListener('blur', cleanupGhost);
+  }
+
+  function removeOverlay(input) {
+    input.dataset.hasHintOverlay = '';
+    // The cleanupGhost function inside createOverlay will handle removing the ghost
+  }
+
+  // Attach overlay on focus, remove on blur
+  function attachOverlayEvents(input) {
+    input.addEventListener('focus', () => {
+      createOverlay(input);
+      // On focus, trigger input event to update suggestion
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     input.addEventListener('blur', () => {
-      ghost.value = '';
-      suggestion = '';
+      removeOverlay(input);
     });
   }
 
@@ -166,18 +197,10 @@ function activateAutocomplete () {
     if (el.dataset.hasHintOverlay) return;
     el.dataset.hasHintOverlay = 'true';
   
-    const wrapper = document.createElement('div');
-    wrapper.style.position = 'relative';
-    wrapper.style.display = 'inline-block';
-    wrapper.style.width = el.offsetWidth + 'px';
-    wrapper.style.height = el.offsetHeight + 'px';
-  
     const ghost = document.createElement('div');
     ghost.className = 'autocomplete-ghost';
     ghost.style.position = 'absolute';
-    ghost.style.top = '0';
-    ghost.style.left = '0';
-    ghost.style.zIndex = '0';
+    ghost.style.zIndex = '9999';
     ghost.style.pointerEvents = 'none';
     ghost.style.color = 'rgba(0, 0, 0, 0.3)';
     ghost.style.whiteSpace = 'pre-wrap';
@@ -189,8 +212,6 @@ function activateAutocomplete () {
     ghost.style.margin = style.margin;
     ghost.style.border = style.border;
     ghost.style.lineHeight = style.lineHeight;
-    ghost.style.width = style.width;
-    ghost.style.height = style.height;
   
     // Make ghost text semi-transparent
     const originalColor = style.color;
@@ -199,15 +220,39 @@ function activateAutocomplete () {
       ghost.style.color = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.3)`;
     }
 
+    el.parentNode.insertBefore(ghost, el);
     el.style.position = 'relative';
-    el.style.zIndex = '1';
+    el.style.zIndex = '10000';
     el.style.backgroundColor = 'transparent';
+    el.style.background = 'transparent';
   
-    el.parentNode.insertBefore(wrapper, el);
-    wrapper.appendChild(ghost);
-    wrapper.appendChild(el);
+    // Positioning: ensure parent is relative
+    const parent = el.parentNode;
+    if (parent && getComputedStyle(parent).position === 'static') {
+      parent.style.position = 'relative';
+    }
+
+    function updateGhostPosition() {
+      const rect = el.getBoundingClientRect();
+      const parentRect = parent.getBoundingClientRect();
+      ghost.style.top = (rect.top - parentRect.top + parent.scrollTop) + 'px';
+      ghost.style.left = (rect.left - parentRect.left + parent.scrollLeft) + 'px';
+      ghost.style.width = rect.width + 'px';
+      ghost.style.height = rect.height + 'px';
+    }
+    updateGhostPosition();
+    window.addEventListener('scroll', updateGhostPosition, true);
+    window.addEventListener('resize', updateGhostPosition);
+
+    function cleanupGhost() {
+      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      window.removeEventListener('scroll', updateGhostPosition, true);
+      window.removeEventListener('resize', updateGhostPosition);
+      suggestion = '';
+    }
   
     el.addEventListener('input', () => {
+      updateGhostPosition();
       const value = el.innerText;
       if (!value.trim()) {
         ghost.innerText = '';
@@ -257,12 +302,24 @@ function activateAutocomplete () {
       }
     });
   
-    el.addEventListener('blur', () => {
-      ghost.innerText = '';
-      suggestion = '';
-    });
+    el.addEventListener('blur', cleanupGhost);
   }
   
+  function removeOverlayForEditable(el) {
+    el.dataset.hasHintOverlay = '';
+    // The cleanupGhost function inside createOverlayForEditable will handle removing the ghost
+  }
+
+  function attachOverlayEventsForEditable(el) {
+    el.addEventListener('focus', () => {
+      createOverlayForEditable(el);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    el.addEventListener('blur', () => {
+      removeOverlayForEditable(el);
+    });
+  }
+
   // Helper: insert text at caret
   function insertTextAtCursor(text) {
     const sel = window.getSelection();
@@ -308,11 +365,19 @@ function activateAutocomplete () {
   
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
       if (!el.readOnly && !el.disabled) {
-        createOverlay(el);
+        attachOverlayEvents(el);
+        // If already focused, ensure overlay is present
+        if (document.activeElement === el) {
+          createOverlay(el);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
       }
     } else if (el.isContentEditable) {
-      createOverlayForEditable(el);
-  
+      attachOverlayEventsForEditable(el);
+      if (document.activeElement === el) {
+        createOverlayForEditable(el);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
       // Ensure keydown is directly attached
       el.addEventListener('keydown', (e) => {
         if (e.key === 'Tab' && suggestion) {
