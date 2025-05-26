@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Uzantı Ayarları</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 30px auto;
+      max-width: 500px;
+      color: #333;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+      color: #444;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    button {
+      padding: 8px 14px;
+      font-size: 14px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    li {
+      background: #f1f1f1;
+      padding: 8px 12px;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 4px;
+    }
+
+    .remove-btn {
+      background-color: #dc3545;
+      padding: 4px 10px;
+      font-size: 12px;
+      border: none;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .remove-btn:hover {
+      background-color: #a71d2a;
+    }
+  </style>
+</head>
+<body>
+  <h2>İzin Verilen Siteler</h2>
+  <div class="input-group">
+    <input type="text" id="allowedInput" placeholder="ör. google.com">
+    <button id="addAllowedBtn">Ekle</button>
+  </div>
+  <ul id="allowedList"></ul>
+
+  <script src="settings.js"></script>
+</body>
+</html>

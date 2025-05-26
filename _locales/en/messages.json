@@ -1,0 +1,32 @@
+{
+  "extensionName": {
+    "message": "Text Completer"
+  },
+  "extensionDescription": {
+    "message": "Suggests text completions from saved texts."
+  },
+  "savedTexts": {
+    "message": "Saved Texts"
+  },
+  "addSentenceText": {
+    "message": "Add Text"
+  },
+  "allowedWebsites": {
+    "message": "Allowed Websites"
+  },
+  "addAllowedText": {
+    "message": "Add"
+  },
+  "settingsText": {
+    "message": "Settings"
+  },
+  "exAllowedText": {
+    "message": "ex. google.com"
+  },
+  "noSentences": {
+    "message": "No sentences added."
+  },
+  "noAllowedSites": {
+    "message": "No allowed sites."
+  }
+}

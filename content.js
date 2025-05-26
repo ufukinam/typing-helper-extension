@@ -1,0 +1,113 @@
+let suggestion = '';
+let sentences = [];
+
+const normalize = str => str.toLocaleLowerCase('tr-TR');
+
+const hostname = window.location.hostname;
+
+chrome.storage.sync.get(['sentences','allowedSites'], (result) => {
+  sentences = result.sentences || [];
+  const allowedSites = result.allowedSites || [];
+
+  if (allowedSites.length > 0 && !allowedSites.some(site => hostname.includes(site))) {
+    console.log('Site not explicitly allowed:', hostname);
+    return;
+  }
+
+  console.log('Site allowed:', hostname);
+  activateAutocomplete();
+});
+
+function activateAutocomplete() {
+  function cloneInputStyles(source, target) {
+    const style = getComputedStyle(source);
+    for (const prop of [
+      'font', 'fontSize', 'padding', 'margin', 'border', 'outline',
+      'boxSizing', 'width', 'height', 'lineHeight', 'letterSpacing',
+      'textAlign', 'borderRadius', 'boxShadow', 'backgroundColor',
+      'color', 'whiteSpace'
+    ]) {
+      target.style[prop] = style[prop];
+    }
+  }
+
+  function createOverlay(input) {
+    if (input.dataset.hasHintOverlay) return;
+    input.dataset.hasHintOverlay = 'true';
+
+    const isTextarea = input.tagName === 'TEXTAREA';
+
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'relative';
+    wrapper.style.display = getComputedStyle(input).display === 'block' ? 'block' : 'inline-block';
+    wrapper.style.width = input.offsetWidth + 'px';
+    wrapper.style.height = input.offsetHeight + 'px';
+
+    const ghost = document.createElement(isTextarea ? 'textarea' : 'input');
+    ghost.disabled = true;
+    ghost.className = 'autocomplete-ghost';
+    ghost.style.position = 'absolute';
+    ghost.style.top = '0';
+    ghost.style.left = '0';
+    ghost.style.zIndex = '0';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.color = '#aaa';
+    ghost.style.background = 'transparent';
+    ghost.style.borderColor = 'transparent';
+    ghost.style.resize = 'none';
+    ghost.style.overflow = 'hidden';
+    ghost.style.width = '100%';
+    ghost.style.height = '100%';
+
+    cloneInputStyles(input, ghost);
+
+    input.style.position = 'relative';
+    input.style.zIndex = '1';
+    input.style.backgroundColor = 'transparent';
+
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(ghost);
+    wrapper.appendChild(input);
+
+    input.addEventListener('input', () => {
+      const value = input.value;
+      if (!value.trim()) {
+        ghost.value = '';
+        suggestion = '';
+        return;
+      }
+
+      const match = sentences.find(s => normalize(s).startsWith(normalize(value)));
+      if (match && normalize(match) !== normalize(value)) {
+        ghost.value = match;
+        suggestion = match;
+      } else {
+        ghost.value = '';
+        suggestion = '';
+      }
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' && suggestion) {
+        e.preventDefault();
+        const value = input.value;
+        const completion = suggestion.slice(value.length);
+        input.setRangeText(completion, input.selectionStart, input.selectionEnd, 'end');
+        ghost.value = '';
+        suggestion = '';
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      ghost.value = '';
+      suggestion = '';
+    });
+  }
+
+  document.addEventListener('focusin', (e) => {
+    const el = e.target;
+    if ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && !el.readOnly && !el.disabled) {
+      createOverlay(el);
+    }
+  });
+}

@@ -1,0 +1,32 @@
+{
+  "extensionName": {
+    "message": "Metin Tamamlayıcı"
+  },
+  "extensionDescription": {
+    "message": "Kayıtlı metinlerden yazıyı tamamlar."
+  },
+  "savedTexts": {
+    "message": "Kayıtlı Metinler"
+  },
+  "addSentenceText": {
+    "message": "Metin Ekle"
+  },
+  "allowedWebsites": {
+    "message": "İzin Verilen İnternet Siteleri"
+  },
+  "addAllowedText": {
+    "message": "Ekle"
+  },
+  "settingsText": {
+    "message": "Ayarlar"
+  },
+  "exAllowedText": {
+    "message": "ör. google.com"
+  },
+  "noSentences": {
+    "message": "Eklenen metin yok."
+  },
+  "noAllowedSites": {
+    "message": "İzin verilen site yok."
+  }
+}
