@@ -110,21 +110,27 @@ function activateAutocomplete () {
 
       for (const [key, fullText] of Object.entries(shortcuts)) {
         if (normalize(key) === normalizedWord) {
-          // Replace keyword with full sentence
-          words[words.length - 1] = fullText;
-          const newValue = words.join(' ');
-          input.value = newValue;
-
-          // Move cursor to end
-          input.setSelectionRange(newValue.length, newValue.length);
-
-          input.dispatchEvent(new InputEvent('input', {
-            inputType: 'insertText',
-            data: fullText,
-            bubbles: true,
-            cancelable: true
-          }));
-
+          // Replace keyword with full sentence using execCommand for undo support
+          const start = input.selectionStart;
+          const end = input.selectionEnd;
+          const before = input.value.slice(0, start - lastWord.length);
+          const after = input.value.slice(end);
+          input.focus();
+          input.setSelectionRange(start - lastWord.length, end);
+          // Try execCommand first
+          const inserted = document.execCommand('insertText', false, fullText);
+          if (!inserted) {
+            // Fallback if execCommand fails
+            input.value = before + fullText + after;
+            const cursorPos = before.length + fullText.length;
+            input.setSelectionRange(cursorPos, cursorPos);
+            input.dispatchEvent(new InputEvent('input', {
+              inputType: 'insertText',
+              data: fullText,
+              bubbles: true,
+              cancelable: true
+            }));
+          }
           return; // stop suggestion for now
         }
       }
@@ -253,7 +259,9 @@ function activateAutocomplete () {
   
     el.addEventListener('input', () => {
       updateGhostPosition();
-      const value = el.innerText;
+      // Strip <br> and all HTML tags from contenteditable
+      let value = el.innerHTML.replace(/<br\s*\/?>(\n)?/gi, ' ');
+      value = value.replace(/<[^>]+>/g, '');
       if (!value.trim()) {
         ghost.innerText = '';
         suggestion = '';
@@ -270,13 +278,27 @@ function activateAutocomplete () {
 
       for (const [key, fullText] of Object.entries(shortcuts)) {
         if (normalize(key) === normalizedWord) {
-          words[words.length - 1] = fullText;
-          const newText = words.join(' ');
-          el.innerText = newText;
-          placeCaretAtEnd(el);
+          // Replace keyword with full sentence using execCommand for undo support
+          const sel = window.getSelection();
+          if (sel.rangeCount) {
+            const range = sel.getRangeAt(0);
+            // Move range to cover the last word
+            range.setStart(range.endContainer, range.endOffset - lastWord.length);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            el.focus();
+            // Try execCommand
+            const inserted = document.execCommand('insertText', false, fullText);
+            if (!inserted) {
+              // Fallback: replace manually
+              range.deleteContents();
+              range.insertNode(document.createTextNode(fullText));
+              placeCaretAtEnd(el);
+              el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+            }
+          }
           ghost.innerText = '';
           suggestion = '';
-          el.dispatchEvent(new InputEvent('input', { bubbles: true }));
           return;
         }
       }
