@@ -3,30 +3,159 @@
     "message": "Metin Tamamlayıcı"
   },
   "extensionDescription": {
-    "message": "Kayıtlı metinlerden yazıyı tamamlar."
+    "message": "Kayıtlı metinleri ve kısayol metinlerini yazarken otomatik tamamlama ile kullanın."
   },
-  "savedTexts": {
+  "popupTitle": {
+    "message": "Metin Tamamlayıcı"
+  },
+  "savedTextsTitle": {
     "message": "Kayıtlı Metinler"
   },
-  "addSentenceText": {
+  "sentencePlaceholder": {
+    "message": "Kaydetmek istediğiniz metni girin."
+  },
+  "addTextButton": {
     "message": "Metin Ekle"
   },
-  "allowedWebsites": {
-    "message": "İzin Verilen İnternet Siteleri"
+  "deleteTextButton": {
+    "message": "Metni sil"
   },
-  "addAllowedText": {
-    "message": "Ekle"
-  },
-  "settingsText": {
-    "message": "Ayarlar"
-  },
-  "exAllowedText": {
-    "message": "ör. google.com"
+  "popupHelperText": {
+    "message": "Yukarı/Aşağı Ok ile öneriler arasında geçin ve seçili metni eklemek için kabul tuşunuzu kullanın."
   },
   "noSentences": {
-    "message": "Eklenen metin yok."
+    "message": "Henüz kayıtlı metin yok."
+  },
+  "openSettingsButton": {
+    "message": "Ayarları Aç"
+  },
+  "currentSiteTitle": {
+    "message": "Geçerli Site"
+  },
+  "currentSiteHelper": {
+    "message": "Bu liste boşsa uzantı tüm sitelerde çalışır."
+  },
+  "currentSiteStatusGlobal": {
+    "message": "Tüm siteler şu anda etkin."
+  },
+  "currentSiteStatusAllowed": {
+    "message": "Bu sitede otomatik tamamlama etkin."
+  },
+  "currentSiteStatusBlocked": {
+    "message": "Bu site izin verilenler listesinde değil."
+  },
+  "currentSiteActionRestrict": {
+    "message": "Sadece Bu Site"
+  },
+  "enableCurrentSiteButton": {
+    "message": "Sitede Etkinleştir"
+  },
+  "disableCurrentSiteButton": {
+    "message": "Siteyi Kapat"
+  },
+  "siteUnavailable": {
+    "message": "Kullanılamıyor"
+  },
+  "siteUnavailableDescription": {
+    "message": "Bu sekmede erişilebilir bir web sitesi adresi yok."
+  },
+  "siteUnavailableAction": {
+    "message": "Kullanılamıyor"
+  },
+  "settingsPageTitle": {
+    "message": "Uzantı Ayarları"
+  },
+  "settingsHelperText": {
+    "message": "Kısayollar için bir tetikleyici karakter kullanın. Öneriler arasında Yukarı/Aşağı Ok ile geçebilir ve seçtiğiniz tuş ile kabul edebilirsiniz."
+  },
+  "allowedSitesTitle": {
+    "message": "İzin Verilen Siteler"
+  },
+  "allowedSitesHelper": {
+    "message": "Bu listeyi boş bırakırsanız uzantı tüm sitelerde çalışır."
+  },
+  "allowedSiteLabel": {
+    "message": "Site alan adı"
+  },
+  "allowedSitePlaceholder": {
+    "message": "örn. example.com"
+  },
+  "addButton": {
+    "message": "Ekle"
+  },
+  "removeButton": {
+    "message": "Sil"
   },
   "noAllowedSites": {
-    "message": "İzin verilen site yok."
+    "message": "İzin verilen site ayarlanmamış."
+  },
+  "shortcutSettingsTitle": {
+    "message": "Kısayol Metinleri"
+  },
+  "shortcutHelper": {
+    "message": "Sayfada tetikleyici karakteri ve anahtarı yazarak kayıtlı metni genişletin."
+  },
+  "shortcutKeyLabel": {
+    "message": "Kısayol anahtarı"
+  },
+  "shortcutValueLabel": {
+    "message": "Kısayol metni"
+  },
+  "shortcutKeyPlaceholder": {
+    "message": "anahtar"
+  },
+  "shortcutValuePlaceholder": {
+    "message": "Eklemek istediğiniz metni girin."
+  },
+  "addShortcutButton": {
+    "message": "Kısayol Ekle"
+  },
+  "noShortcuts": {
+    "message": "Kısayol ayarlanmamış."
+  },
+  "typingBehaviorTitle": {
+    "message": "Yazma Davranışı"
+  },
+  "triggerCharacterLabel": {
+    "message": "Tetikleyici karakter"
+  },
+  "acceptKeyLabel": {
+    "message": "Kabul tuşu"
+  },
+  "acceptKeyTab": {
+    "message": "Tab"
+  },
+  "acceptKeyEnter": {
+    "message": "Enter"
+  },
+  "acceptKeyArrowRight": {
+    "message": "Sağ Ok"
+  },
+  "languageLabel": {
+    "message": "Dil"
+  },
+  "languageBrowser": {
+    "message": "Tarayıcı Varsayılanı"
+  },
+  "languageEnglish": {
+    "message": "İngilizce"
+  },
+  "languageTurkish": {
+    "message": "Türkçe"
+  },
+  "dangerZoneTitle": {
+    "message": "Tehlikeli Bölge"
+  },
+  "clearDataHelper": {
+    "message": "Tüm kayıtlı metinleri, izin verilen siteleri, kısayolları ve yazma tercihlerini silin."
+  },
+  "clearDataButton": {
+    "message": "Her şeyi Temizle"
+  },
+  "duplicateSiteAlert": {
+    "message": "Bu site zaten listede."
+  },
+  "duplicateShortcutAlert": {
+    "message": "Bu kısayol zaten var."
   }
 }

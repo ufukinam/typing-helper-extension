@@ -1,51 +1,150 @@
+const Shared = globalThis.TypingHelperShared;
+const settingsStore = Shared.createSettingsStore(chrome.storage.sync);
+
 const sentenceInput = document.getElementById('sentence');
 const addBtn = document.getElementById('addBtn');
 const list = document.getElementById('list');
-let sentences = [];
+const currentSiteLabel = document.getElementById('currentSite');
+const siteStatusLabel = document.getElementById('siteStatus');
+const toggleSiteBtn = document.getElementById('toggleSiteBtn');
+const openSettingsBtn = document.getElementById('openSettingsBtn');
 
-function render() {
-  list.innerHTML = '';
-  if (sentences.length === 0) {
-    list.textContent = 'Eklenen metin yok.';
-    return;
-  }
+let settings = Shared.normalizeSettings({});
+let currentDomain = '';
 
-  sentences.forEach((sentence, index) => {
-    const div = document.createElement('div');
-    div.className = 'sentence';
-
-    const textSpan = document.createElement('span');
-    textSpan.textContent = sentence;
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.textContent = 'X';
-    deleteBtn.className = 'delete-btn';
-    deleteBtn.onclick = () => {
-      sentences.splice(index, 1);
-      chrome.storage.sync.set({ sentences });
-      render();
-    };
-
-    div.appendChild(textSpan);
-    div.appendChild(deleteBtn);
-    list.appendChild(div);
+function containsOrigins(origins) {
+  return new Promise((resolve) => {
+    chrome.permissions.contains({ origins }, (result) => resolve(Boolean(result)));
   });
 }
 
-chrome.storage.sync.get(['sentences'], (result) => {
-  sentences = result.sentences || [];
-  render();
-});
+function requestOrigins(origins) {
+  return new Promise((resolve) => {
+    chrome.permissions.request({ origins }, (result) => resolve(Boolean(result)));
+  });
+}
 
-addBtn.onclick = () => {
-  const text = sentenceInput.value.trim();
-  if (text && !sentences.includes(text)) {
-    sentences.push(text);
-    chrome.storage.sync.set({ sentences });
-    render();
-    sentenceInput.value = '';
+function removeOrigins(origins) {
+  return new Promise((resolve) => {
+    chrome.permissions.remove({ origins }, (result) => resolve(Boolean(result)));
+  });
+}
+
+function applyLanguage() {
+  Shared.setLanguagePreference(settings.language);
+  Shared.localizeDocument(document, settings.language);
+}
+
+function renderSentences() {
+  list.innerHTML = '';
+
+  if (!settings.sentences.length) {
+    const empty = document.createElement('p');
+    empty.textContent = Shared.getMessage('noSentences');
+    list.appendChild(empty);
+    return;
   }
-};
+
+  settings.sentences.forEach((sentence, index) => {
+    const row = document.createElement('div');
+    row.className = 'sentence';
+
+    const text = document.createElement('span');
+    text.textContent = sentence;
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'delete-btn';
+    deleteBtn.setAttribute('aria-label', Shared.getMessage('deleteTextButton'));
+    deleteBtn.title = Shared.getMessage('deleteTextButton');
+    deleteBtn.textContent = 'X';
+    deleteBtn.addEventListener('click', () => {
+      const sentences = settings.sentences.filter((_, itemIndex) => itemIndex !== index);
+      settingsStore.set({ sentences }, (nextSettings) => {
+        settings = nextSettings;
+        renderSentences();
+      });
+    });
+
+    row.appendChild(text);
+    row.appendChild(deleteBtn);
+    list.appendChild(row);
+  });
+}
+
+async function renderCurrentSite() {
+  if (!currentDomain) {
+    currentSiteLabel.textContent = Shared.getMessage('siteUnavailable');
+    siteStatusLabel.textContent = Shared.getMessage('siteUnavailableDescription');
+    toggleSiteBtn.textContent = Shared.getMessage('siteUnavailableAction');
+    toggleSiteBtn.disabled = true;
+    return;
+  }
+
+  currentSiteLabel.textContent = currentDomain;
+
+  const whitelistEnabled = settings.allowedSites.length > 0;
+  const matchedRule = Shared.findAllowedSiteMatch(currentDomain, settings.allowedSites);
+  const hasExactRule = settings.allowedSites.includes(currentDomain);
+  const permissionGranted = matchedRule
+    ? await containsOrigins(Shared.getHostPermissionPatterns(matchedRule))
+    : false;
+  const currentAllowed = Boolean(matchedRule);
+
+  if (!whitelistEnabled) {
+    toggleSiteBtn.disabled = false;
+    siteStatusLabel.textContent = Shared.getMessage('currentSiteStatusGlobal');
+    toggleSiteBtn.textContent = Shared.getMessage('enableCurrentSiteButton');
+    return;
+  }
+
+  if (currentAllowed && permissionGranted && !hasExactRule) {
+    toggleSiteBtn.disabled = true;
+    siteStatusLabel.textContent = Shared.getMessage('currentSiteStatusInherited', [matchedRule]);
+    toggleSiteBtn.textContent = Shared.getMessage('currentSiteManagedByParentAction');
+    return;
+  }
+
+  toggleSiteBtn.disabled = false;
+
+  siteStatusLabel.textContent = currentAllowed && permissionGranted
+    ? Shared.getMessage('currentSiteStatusAllowed')
+    : Shared.getMessage('currentSiteStatusBlocked');
+  toggleSiteBtn.textContent = currentAllowed && permissionGranted
+    ? Shared.getMessage('disableCurrentSiteButton')
+    : Shared.getMessage('enableCurrentSiteButton');
+}
+
+async function loadCurrentDomain() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+  if (!tab?.url || (!tab.url.startsWith('http://') && !tab.url.startsWith('https://'))) {
+    currentDomain = '';
+    void renderCurrentSite();
+    return;
+  }
+
+  currentDomain = Shared.normalizeDomain(tab.url);
+  void renderCurrentSite();
+}
+
+addBtn.addEventListener('click', () => {
+  const value = sentenceInput.value.trim();
+  if (!value) {
+    return;
+  }
+
+  const nextSentences = Shared.normalizeSettings({
+    ...settings,
+    sentences: [...settings.sentences, value]
+  }).sentences;
+
+  settingsStore.set({ sentences: nextSentences }, (nextSettings) => {
+    settings = nextSettings;
+    sentenceInput.value = '';
+    renderSentences();
+  });
+});
 
 sentenceInput.addEventListener('keydown', (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
@@ -53,3 +152,53 @@ sentenceInput.addEventListener('keydown', (event) => {
     addBtn.click();
   }
 });
+
+toggleSiteBtn.addEventListener('click', () => {
+  if (!currentDomain) {
+    return;
+  }
+
+  void (async () => {
+    const matchedRule = Shared.findAllowedSiteMatch(currentDomain, settings.allowedSites);
+    const hasExactRule = settings.allowedSites.includes(currentDomain);
+    const permissionGranted = matchedRule
+      ? await containsOrigins(Shared.getHostPermissionPatterns(matchedRule))
+      : false;
+    let nextAllowedSites;
+
+    if (!matchedRule || !permissionGranted) {
+      const granted = await requestOrigins(Shared.getHostPermissionPatterns(currentDomain));
+      if (!granted) {
+        alert(Shared.getMessage('sitePermissionDeniedAlert'));
+        return;
+      }
+
+      nextAllowedSites = settings.allowedSites.includes(currentDomain)
+        ? settings.allowedSites
+        : [...settings.allowedSites, currentDomain];
+    } else if (hasExactRule) {
+      await removeOrigins(Shared.getHostPermissionPatterns(currentDomain));
+      nextAllowedSites = settings.allowedSites.filter((site) => site !== currentDomain);
+    } else {
+      return;
+    }
+
+    settingsStore.set({ allowedSites: nextAllowedSites }, (nextSettings) => {
+      settings = nextSettings;
+      void renderCurrentSite();
+    });
+  })();
+});
+
+openSettingsBtn.addEventListener('click', () => {
+  chrome.runtime.openOptionsPage();
+});
+
+settingsStore.get((nextSettings) => {
+  settings = nextSettings;
+  applyLanguage();
+  renderSentences();
+  void renderCurrentSite();
+});
+
+loadCurrentDomain();
