@@ -1,4 +1,10 @@
 (function initContentScript() {
+  if (globalThis.__typingHelperContentScriptLoaded) {
+    return;
+  }
+
+  globalThis.__typingHelperContentScriptLoaded = true;
+
   const Shared = globalThis.TypingHelperShared;
   const settingsStore = Shared.createSettingsStore(chrome.storage.sync);
   const hostname = window.location.hostname.toLowerCase();
@@ -335,18 +341,24 @@
 
       const range = selection.getRangeAt(0);
       const lastWord = this.getLastWord();
-      if (!lastWord || range.endContainer.nodeType !== Node.TEXT_NODE) {
+      const endpoint = resolveEditableEndpoint(this.element, range.endContainer, range.endOffset);
+      if (!lastWord || !endpoint) {
         return false;
       }
 
-      const startOffset = range.endOffset - lastWord.length;
-      if (startOffset < 0) {
+      const startPosition = findTextPositionBefore(
+        this.element,
+        endpoint.node,
+        endpoint.offset,
+        lastWord.length
+      );
+      if (!startPosition) {
         return false;
       }
 
       const replacementRange = document.createRange();
-      replacementRange.setStart(range.endContainer, startOffset);
-      replacementRange.setEnd(range.endContainer, range.endOffset);
+      replacementRange.setStart(startPosition.node, startPosition.offset);
+      replacementRange.setEnd(endpoint.node, endpoint.offset);
       selection.removeAllRanges();
       selection.addRange(replacementRange);
       this.element.focus();
@@ -713,6 +725,125 @@
     return list;
   }
 
+  function createTextNodeWalker(root) {
+    return document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node) {
+          return node.textContent
+            ? NodeFilter.FILTER_ACCEPT
+            : NodeFilter.FILTER_REJECT;
+        }
+      }
+    );
+  }
+
+  function findLastTextNode(root) {
+    if (!root) {
+      return null;
+    }
+
+    if (root.nodeType === Node.TEXT_NODE) {
+      return root.textContent ? root : null;
+    }
+
+    const walker = createTextNodeWalker(root);
+    let current = null;
+    let last = null;
+
+    while ((current = walker.nextNode())) {
+      last = current;
+    }
+
+    return last;
+  }
+
+  function findPreviousTextPosition(root, referenceNode, referenceOffset) {
+    const walker = createTextNodeWalker(root);
+    const referenceRange = document.createRange();
+    referenceRange.setStart(referenceNode, referenceOffset);
+    referenceRange.collapse(true);
+
+    let current = null;
+    let previous = null;
+
+    while ((current = walker.nextNode())) {
+      const nodeEndRange = document.createRange();
+      nodeEndRange.selectNodeContents(current);
+      nodeEndRange.collapse(false);
+
+      if (nodeEndRange.compareBoundaryPoints(Range.START_TO_START, referenceRange) >= 0) {
+        break;
+      }
+
+      previous = current;
+    }
+
+    return previous
+      ? { node: previous, offset: previous.textContent.length }
+      : null;
+  }
+
+  function resolveEditableEndpoint(root, container, offset) {
+    if (!root.contains(container)) {
+      return null;
+    }
+
+    if (container.nodeType === Node.TEXT_NODE) {
+      return {
+        node: container,
+        offset: Math.min(offset, container.textContent.length)
+      };
+    }
+
+    if (container.nodeType !== Node.ELEMENT_NODE) {
+      return null;
+    }
+
+    if (offset > 0) {
+      const previousChild = container.childNodes[offset - 1];
+      const lastTextNode = findLastTextNode(previousChild);
+      if (lastTextNode) {
+        return {
+          node: lastTextNode,
+          offset: lastTextNode.textContent.length
+        };
+      }
+    }
+
+    return findPreviousTextPosition(root, container, offset);
+  }
+
+  function findTextPositionBefore(root, endNode, endOffset, characterCount) {
+    let remaining = characterCount;
+    let currentNode = endNode;
+    let currentOffset = endOffset;
+
+    while (currentNode && remaining > 0) {
+      const available = currentOffset;
+      if (available >= remaining) {
+        return {
+          node: currentNode,
+          offset: currentOffset - remaining
+        };
+      }
+
+      remaining -= available;
+      const previous = findPreviousTextPosition(root, currentNode, 0);
+      if (!previous) {
+        return null;
+      }
+
+      currentNode = previous.node;
+      currentOffset = previous.offset;
+    }
+
+    return remaining === 0
+      ? { node: currentNode, offset: currentOffset }
+      : null;
+  }
+
   function setFormControlValue(element, value) {
     const prototype = element instanceof HTMLTextAreaElement
       ? HTMLTextAreaElement.prototype
@@ -743,8 +874,8 @@
     refreshActiveController();
   });
 
-  settingsStore.watch((partialSettings) => {
-    settings = Shared.normalizeSettings({ ...settings, ...partialSettings });
+  settingsStore.watch((nextSettings) => {
+    settings = nextSettings;
     refreshActiveController();
   });
 })();

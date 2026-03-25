@@ -23,11 +23,13 @@
       saveSelectionContextMenu: 'Save selected text',
       openSettingsButton: 'Open Settings',
       currentSiteTitle: 'Current Site',
-      currentSiteHelper: 'When no sites are listed, the extension works on all sites.',
-      currentSiteStatusGlobal: 'All sites are currently enabled.',
+      currentSiteHelper: 'Enable only the sites where you want the extension to run.',
+      currentSiteStatusGlobal: 'No sites are enabled yet.',
       currentSiteStatusAllowed: 'Autocomplete is enabled on this site.',
+      currentSiteStatusInherited: 'Autocomplete is enabled on this site via $1.',
       currentSiteStatusBlocked: 'This site is not in the allowed list.',
-      currentSiteActionRestrict: 'Only This Site',
+      currentSiteActionRestrict: 'Enable This Site',
+      currentSiteManagedByParentAction: 'Managed by Parent Rule',
       enableCurrentSiteButton: 'Enable Site',
       disableCurrentSiteButton: 'Disable Site',
       siteUnavailable: 'Unavailable',
@@ -36,7 +38,7 @@
       settingsPageTitle: 'Extension Settings',
       settingsHelperText: 'Use a trigger character for shortcuts. Suggestions can be switched with Arrow Up/Down and accepted with your selected key.',
       allowedSitesTitle: 'Allowed Sites',
-      allowedSitesHelper: 'Leave this list empty to enable the extension on all sites.',
+      allowedSitesHelper: 'The extension runs only on the sites listed here.',
       allowedSiteLabel: 'Site domain',
       allowedSitePlaceholder: 'example.com',
       addButton: 'Add',
@@ -64,7 +66,8 @@
       clearDataHelper: 'Remove all saved texts, allowed sites, shortcuts, and typing preferences.',
       clearDataButton: 'Clear Everything',
       duplicateSiteAlert: 'This site is already in the list.',
-      duplicateShortcutAlert: 'This shortcut already exists.'
+      duplicateShortcutAlert: 'This shortcut already exists.',
+      sitePermissionDeniedAlert: 'Chrome site access was not granted for this site.'
     },
     tr: {
       extensionName: 'Metin Tamamlayıcı',
@@ -79,11 +82,13 @@
       saveSelectionContextMenu: 'Seçili metni kaydet',
       openSettingsButton: 'Ayarları Aç',
       currentSiteTitle: 'Geçerli Site',
-      currentSiteHelper: 'Bu liste boşsa uzantı tüm sitelerde çalışır.',
-      currentSiteStatusGlobal: 'Tüm siteler şu anda etkin.',
+      currentSiteHelper: 'Uzantıyı yalnızca çalışmasını istediğiniz sitelerde etkinleştirin.',
+      currentSiteStatusGlobal: 'Henüz etkinleştirilmiş site yok.',
       currentSiteStatusAllowed: 'Bu sitede otomatik tamamlama etkin.',
+      currentSiteStatusInherited: 'Bu sitede otomatik tamamlama $1 kuralı ile etkin.',
       currentSiteStatusBlocked: 'Bu site izin verilenler listesinde değil.',
-      currentSiteActionRestrict: 'Sadece Bu Site',
+      currentSiteActionRestrict: 'Bu Siteyi Etkinleştir',
+      currentSiteManagedByParentAction: 'Üst Alan Adı Kuralı',
       enableCurrentSiteButton: 'Sitede Etkinleştir',
       disableCurrentSiteButton: 'Sitede Kapat',
       siteUnavailable: 'Kullanılamıyor',
@@ -92,7 +97,7 @@
       settingsPageTitle: 'Uzantı Ayarları',
       settingsHelperText: 'Kısayollar için bir tetikleyici karakter kullanın. Öneriler arasında Yukarı/Aşağı Ok ile geçebilir ve seçtiğiniz tuş ile kabul edebilirsiniz.',
       allowedSitesTitle: 'İzin Verilen Siteler',
-      allowedSitesHelper: 'Bu listeyi boş bırakırsanız uzantı tüm sitelerde çalışır.',
+      allowedSitesHelper: 'Uzantı yalnızca burada listelenen sitelerde çalışır.',
       allowedSiteLabel: 'Site alan adı',
       allowedSitePlaceholder: 'örn. example.com',
       addButton: 'Ekle',
@@ -120,13 +125,18 @@
       clearDataHelper: 'Tüm kayıtlı metinleri, izin verilen siteleri, kısayolları ve yazma tercihlerini silin.',
       clearDataButton: 'Her şeyi Temizle',
       duplicateSiteAlert: 'Bu site zaten listede.',
-      duplicateShortcutAlert: 'Bu kısayol zaten var.'
+      duplicateShortcutAlert: 'Bu kısayol zaten var.',
+      sitePermissionDeniedAlert: 'Chrome site erişimi bu site için verilmedi.'
     }
   };
   let currentLanguagePreference = DEFAULT_SETTINGS.language;
 
   function normalize(value) {
-    return (value || '').toLocaleLowerCase('tr-TR');
+    return (value || '')
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\u0131/g, 'i')
+      .toLowerCase();
   }
 
   function normalizeDomain(input) {
@@ -146,6 +156,28 @@
         .replace(/^www\./, '')
         .split('/')[0];
     }
+  }
+
+  function getHostPermissionPatterns(input) {
+    const domain = normalizeDomain(input);
+    if (!domain) {
+      return [];
+    }
+
+    const patterns = [
+      `http://${domain}/*`,
+      `https://${domain}/*`
+    ];
+    const supportsWildcardSubdomains =
+      domain.includes('.') &&
+      domain !== 'localhost' &&
+      !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(domain);
+
+    if (supportsWildcardSubdomains) {
+      patterns.push(`http://*.${domain}/*`, `https://*.${domain}/*`);
+    }
+
+    return patterns;
   }
 
   function getTriggerCharacter(value) {
@@ -252,14 +284,28 @@
     };
   }
 
+  function findAllowedSiteMatch(hostname, allowedSites) {
+    const normalizedHostname = normalizeDomain(hostname);
+    if (!normalizedHostname || !allowedSites.length) return '';
+
+    const matches = allowedSites.filter((site) => {
+      return normalizedHostname === site || normalizedHostname.endsWith(`.${site}`);
+    });
+
+    if (!matches.length) {
+      return '';
+    }
+
+    matches.sort((left, right) => right.length - left.length);
+    return matches[0];
+  }
+
   function isSiteAllowed(hostname, allowedSites) {
     const normalizedHostname = normalizeDomain(hostname);
     if (!normalizedHostname) return false;
     if (!allowedSites.length) return true;
 
-    return allowedSites.some((site) => {
-      return normalizedHostname === site || normalizedHostname.endsWith(`.${site}`);
-    });
+    return Boolean(findAllowedSiteMatch(normalizedHostname, allowedSites));
   }
 
   function getSentenceMatches(sentences, value) {
@@ -412,7 +458,9 @@
           }
 
           if (Object.keys(patch).length > 0) {
-            listener(normalizeSettings({ ...DEFAULT_SETTINGS, ...patch }));
+            storage.get(settingsKeys, (current) => {
+              listener(normalizeSettings(current));
+            });
           }
         };
 
@@ -428,7 +476,9 @@
     SnapshotHistory,
     createSettingsStore,
     findShortcutExpansion,
+    findAllowedSiteMatch,
     getMessage,
+    getHostPermissionPatterns,
     getSentenceMatches,
     getTriggerCharacter,
     isSiteAllowed,

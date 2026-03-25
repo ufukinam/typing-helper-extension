@@ -12,6 +12,24 @@ const openSettingsBtn = document.getElementById('openSettingsBtn');
 let settings = Shared.normalizeSettings({});
 let currentDomain = '';
 
+function containsOrigins(origins) {
+  return new Promise((resolve) => {
+    chrome.permissions.contains({ origins }, (result) => resolve(Boolean(result)));
+  });
+}
+
+function requestOrigins(origins) {
+  return new Promise((resolve) => {
+    chrome.permissions.request({ origins }, (result) => resolve(Boolean(result)));
+  });
+}
+
+function removeOrigins(origins) {
+  return new Promise((resolve) => {
+    chrome.permissions.remove({ origins }, (result) => resolve(Boolean(result)));
+  });
+}
+
 function applyLanguage() {
   Shared.setLanguagePreference(settings.language);
   Shared.localizeDocument(document, settings.language);
@@ -54,7 +72,7 @@ function renderSentences() {
   });
 }
 
-function renderCurrentSite() {
+async function renderCurrentSite() {
   if (!currentDomain) {
     currentSiteLabel.textContent = Shared.getMessage('siteUnavailable');
     siteStatusLabel.textContent = Shared.getMessage('siteUnavailableDescription');
@@ -64,21 +82,35 @@ function renderCurrentSite() {
   }
 
   currentSiteLabel.textContent = currentDomain;
-  toggleSiteBtn.disabled = false;
 
   const whitelistEnabled = settings.allowedSites.length > 0;
-  const currentAllowed = Shared.isSiteAllowed(currentDomain, settings.allowedSites);
+  const matchedRule = Shared.findAllowedSiteMatch(currentDomain, settings.allowedSites);
+  const hasExactRule = settings.allowedSites.includes(currentDomain);
+  const permissionGranted = matchedRule
+    ? await containsOrigins(Shared.getHostPermissionPatterns(matchedRule))
+    : false;
+  const currentAllowed = Boolean(matchedRule);
 
   if (!whitelistEnabled) {
+    toggleSiteBtn.disabled = false;
     siteStatusLabel.textContent = Shared.getMessage('currentSiteStatusGlobal');
-    toggleSiteBtn.textContent = Shared.getMessage('currentSiteActionRestrict');
+    toggleSiteBtn.textContent = Shared.getMessage('enableCurrentSiteButton');
     return;
   }
 
-  siteStatusLabel.textContent = currentAllowed
+  if (currentAllowed && permissionGranted && !hasExactRule) {
+    toggleSiteBtn.disabled = true;
+    siteStatusLabel.textContent = Shared.getMessage('currentSiteStatusInherited', [matchedRule]);
+    toggleSiteBtn.textContent = Shared.getMessage('currentSiteManagedByParentAction');
+    return;
+  }
+
+  toggleSiteBtn.disabled = false;
+
+  siteStatusLabel.textContent = currentAllowed && permissionGranted
     ? Shared.getMessage('currentSiteStatusAllowed')
     : Shared.getMessage('currentSiteStatusBlocked');
-  toggleSiteBtn.textContent = currentAllowed
+  toggleSiteBtn.textContent = currentAllowed && permissionGranted
     ? Shared.getMessage('disableCurrentSiteButton')
     : Shared.getMessage('enableCurrentSiteButton');
 }
@@ -88,12 +120,12 @@ async function loadCurrentDomain() {
 
   if (!tab?.url || (!tab.url.startsWith('http://') && !tab.url.startsWith('https://'))) {
     currentDomain = '';
-    renderCurrentSite();
+    void renderCurrentSite();
     return;
   }
 
   currentDomain = Shared.normalizeDomain(tab.url);
-  renderCurrentSite();
+  void renderCurrentSite();
 }
 
 addBtn.addEventListener('click', () => {
@@ -126,19 +158,36 @@ toggleSiteBtn.addEventListener('click', () => {
     return;
   }
 
-  let nextAllowedSites;
-  if (!settings.allowedSites.length) {
-    nextAllowedSites = [currentDomain];
-  } else if (Shared.isSiteAllowed(currentDomain, settings.allowedSites)) {
-    nextAllowedSites = settings.allowedSites.filter((site) => site !== currentDomain);
-  } else {
-    nextAllowedSites = [...settings.allowedSites, currentDomain];
-  }
+  void (async () => {
+    const matchedRule = Shared.findAllowedSiteMatch(currentDomain, settings.allowedSites);
+    const hasExactRule = settings.allowedSites.includes(currentDomain);
+    const permissionGranted = matchedRule
+      ? await containsOrigins(Shared.getHostPermissionPatterns(matchedRule))
+      : false;
+    let nextAllowedSites;
 
-  settingsStore.set({ allowedSites: nextAllowedSites }, (nextSettings) => {
-    settings = nextSettings;
-    renderCurrentSite();
-  });
+    if (!matchedRule || !permissionGranted) {
+      const granted = await requestOrigins(Shared.getHostPermissionPatterns(currentDomain));
+      if (!granted) {
+        alert(Shared.getMessage('sitePermissionDeniedAlert'));
+        return;
+      }
+
+      nextAllowedSites = settings.allowedSites.includes(currentDomain)
+        ? settings.allowedSites
+        : [...settings.allowedSites, currentDomain];
+    } else if (hasExactRule) {
+      await removeOrigins(Shared.getHostPermissionPatterns(currentDomain));
+      nextAllowedSites = settings.allowedSites.filter((site) => site !== currentDomain);
+    } else {
+      return;
+    }
+
+    settingsStore.set({ allowedSites: nextAllowedSites }, (nextSettings) => {
+      settings = nextSettings;
+      void renderCurrentSite();
+    });
+  })();
 });
 
 openSettingsBtn.addEventListener('click', () => {
@@ -149,7 +198,7 @@ settingsStore.get((nextSettings) => {
   settings = nextSettings;
   applyLanguage();
   renderSentences();
-  renderCurrentSite();
+  void renderCurrentSite();
 });
 
 loadCurrentDomain();

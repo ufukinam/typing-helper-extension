@@ -15,6 +15,18 @@ const clearDataBtn = document.getElementById('clearDataBtn');
 
 let settings = Shared.normalizeSettings({});
 
+function requestOrigins(origins) {
+  return new Promise((resolve) => {
+    chrome.permissions.request({ origins }, (result) => resolve(Boolean(result)));
+  });
+}
+
+function removeOrigins(origins) {
+  return new Promise((resolve) => {
+    chrome.permissions.remove({ origins }, (result) => resolve(Boolean(result)));
+  });
+}
+
 function applyLanguage() {
   Shared.setLanguagePreference(settings.language);
   Shared.localizeDocument(document, settings.language);
@@ -39,11 +51,15 @@ function renderAllowedSites() {
     removeBtn.className = 'remove-btn';
     removeBtn.textContent = Shared.getMessage('removeButton');
     removeBtn.addEventListener('click', () => {
-      const allowedSites = settings.allowedSites.filter((value) => value !== site);
-      settingsStore.set({ allowedSites }, (nextSettings) => {
-        settings = nextSettings;
-        renderAllowedSites();
-      });
+      void (async () => {
+        await removeOrigins(Shared.getHostPermissionPatterns(site));
+
+        const allowedSites = settings.allowedSites.filter((value) => value !== site);
+        settingsStore.set({ allowedSites }, (nextSettings) => {
+          settings = nextSettings;
+          renderAllowedSites();
+        });
+      })();
     });
 
     item.appendChild(removeBtn);
@@ -92,22 +108,30 @@ function renderTypingSettings() {
 }
 
 addAllowedBtn.addEventListener('click', () => {
-  const site = Shared.normalizeDomain(allowedInput.value);
-  if (!site) {
-    return;
-  }
+  void (async () => {
+    const site = Shared.normalizeDomain(allowedInput.value);
+    if (!site) {
+      return;
+    }
 
-  if (settings.allowedSites.includes(site)) {
-    alert(Shared.getMessage('duplicateSiteAlert'));
-    allowedInput.value = '';
-    return;
-  }
+    if (settings.allowedSites.includes(site)) {
+      alert(Shared.getMessage('duplicateSiteAlert'));
+      allowedInput.value = '';
+      return;
+    }
 
-  settingsStore.set({ allowedSites: [...settings.allowedSites, site] }, (nextSettings) => {
-    settings = nextSettings;
-    allowedInput.value = '';
-    renderAllowedSites();
-  });
+    const granted = await requestOrigins(Shared.getHostPermissionPatterns(site));
+    if (!granted) {
+      alert(Shared.getMessage('sitePermissionDeniedAlert'));
+      return;
+    }
+
+    settingsStore.set({ allowedSites: [...settings.allowedSites, site] }, (nextSettings) => {
+      settings = nextSettings;
+      allowedInput.value = '';
+      renderAllowedSites();
+    });
+  })();
 });
 
 allowedInput.addEventListener('keydown', (event) => {
@@ -175,12 +199,20 @@ languageSelect.addEventListener('change', (event) => {
 });
 
 clearDataBtn.addEventListener('click', () => {
-  settingsStore.clear((nextSettings) => {
-    settings = nextSettings;
-    renderAllowedSites();
-    renderShortcuts();
-    renderTypingSettings();
-  });
+  void (async () => {
+    const origins = settings.allowedSites.flatMap((site) => Shared.getHostPermissionPatterns(site));
+    if (origins.length) {
+      await removeOrigins(origins);
+    }
+
+    settingsStore.clear((nextSettings) => {
+      settings = nextSettings;
+      applyLanguage();
+      renderAllowedSites();
+      renderShortcuts();
+      renderTypingSettings();
+    });
+  })();
 });
 
 settingsStore.get((nextSettings) => {
