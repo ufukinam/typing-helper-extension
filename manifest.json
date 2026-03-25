@@ -4,7 +4,10 @@
   "version": "2.0.0",
   "default_locale": "en",
   "description": "__MSG_extensionDescription__",
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "tabs", "contextMenus"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
