@@ -12,7 +12,10 @@ const openSettingsBtn = document.getElementById('openSettingsBtn');
 let settings = Shared.normalizeSettings({});
 let currentDomain = '';
 
-Shared.localizeDocument(document);
+function applyLanguage() {
+  Shared.setLanguagePreference(settings.language);
+  Shared.localizeDocument(document, settings.language);
+}
 
 function renderSentences() {
   list.innerHTML = '';
@@ -144,6 +147,7 @@ openSettingsBtn.addEventListener('click', () => {
 
 settingsStore.get((nextSettings) => {
   settings = nextSettings;
+  applyLanguage();
   renderSentences();
   renderCurrentSite();
 });

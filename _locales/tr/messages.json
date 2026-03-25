@@ -1,18 +1,18 @@
 {
   "extensionName": {
-    "message": "Metin Tamamlay\u0131c\u0131"
+    "message": "Metin Tamamlayıcı"
   },
   "extensionDescription": {
-    "message": "Kay\u0131tl\u0131 metinleri ve k\u0131sayol metinlerini yazarken otomatik tamamlama ile kullan\u0131n."
+    "message": "Kayıtlı metinleri ve kısayol metinlerini yazarken otomatik tamamlama ile kullanın."
   },
   "popupTitle": {
-    "message": "Metin Tamamlay\u0131c\u0131"
+    "message": "Metin Tamamlayıcı"
   },
   "savedTextsTitle": {
-    "message": "Kay\u0131tl\u0131 Metinler"
+    "message": "Kayıtlı Metinler"
   },
   "sentencePlaceholder": {
-    "message": "Kaydetmek istedi\u011finiz metni girin."
+    "message": "Kaydetmek istediğiniz metni girin."
   },
   "addTextButton": {
     "message": "Metin Ekle"
@@ -21,64 +21,64 @@
     "message": "Metni sil"
   },
   "popupHelperText": {
-    "message": "Ok Yukar\u0131/Ok A\u015fa\u011f\u0131 ile \u00f6neriler aras\u0131nda ge\u00e7in ve se\u00e7ili metni eklemek i\u00e7in kabul tu\u015funuzu kullan\u0131n."
+    "message": "Yukarı/Aşağı Ok ile öneriler arasında geçin ve seçili metni eklemek için kabul tuşunuzu kullanın."
   },
   "noSentences": {
-    "message": "Hen\u00fcz kay\u0131tl\u0131 metin yok."
+    "message": "Henüz kayıtlı metin yok."
   },
   "openSettingsButton": {
-    "message": "Ayarlar\u0131 A\u00e7"
+    "message": "Ayarları Aç"
   },
   "currentSiteTitle": {
-    "message": "Ge\u00e7erli Site"
+    "message": "Geçerli Site"
   },
   "currentSiteHelper": {
-    "message": "Bu liste bo\u015fsa uzant\u0131 t\u00fcm sitelerde \u00e7al\u0131\u015f\u0131r."
+    "message": "Bu liste boşsa uzantı tüm sitelerde çalışır."
   },
   "currentSiteStatusGlobal": {
-    "message": "T\u00fcm siteler \u015fu anda etkin."
+    "message": "Tüm siteler şu anda etkin."
   },
   "currentSiteStatusAllowed": {
     "message": "Bu sitede otomatik tamamlama etkin."
   },
   "currentSiteStatusBlocked": {
-    "message": "Bu site izin verilenler listesinde de\u011fil."
+    "message": "Bu site izin verilenler listesinde değil."
   },
   "currentSiteActionRestrict": {
     "message": "Sadece Bu Site"
   },
   "enableCurrentSiteButton": {
-    "message": "Siteyi Etkinle\u015ftir"
+    "message": "Sitede Etkinleştir"
   },
   "disableCurrentSiteButton": {
     "message": "Siteyi Kapat"
   },
   "siteUnavailable": {
-    "message": "Kullan\u0131lam\u0131yor"
+    "message": "Kullanılamıyor"
   },
   "siteUnavailableDescription": {
-    "message": "Bu sekmede eri\u015filebilir bir web sitesi adresi yok."
+    "message": "Bu sekmede erişilebilir bir web sitesi adresi yok."
   },
   "siteUnavailableAction": {
-    "message": "Kullan\u0131lam\u0131yor"
+    "message": "Kullanılamıyor"
   },
   "settingsPageTitle": {
-    "message": "Uzant\u0131 Ayarlar\u0131"
+    "message": "Uzantı Ayarları"
   },
   "settingsHelperText": {
-    "message": "K\u0131sayollar i\u00e7in bir tetikleyici karakter kullan\u0131n. \u00d6neriler aras\u0131nda Ok Yukar\u0131/Ok A\u015fa\u011f\u0131 ile ge\u00e7ebilir ve se\u00e7ti\u011finiz tu\u015f ile kabul edebilirsiniz."
+    "message": "Kısayollar için bir tetikleyici karakter kullanın. Öneriler arasında Yukarı/Aşağı Ok ile geçebilir ve seçtiğiniz tuş ile kabul edebilirsiniz."
   },
   "allowedSitesTitle": {
-    "message": "\u0130zin Verilen Siteler"
+    "message": "İzin Verilen Siteler"
   },
   "allowedSitesHelper": {
-    "message": "Bu listeyi bo\u015f b\u0131rak\u0131rsan\u0131z uzant\u0131 t\u00fcm sitelerde \u00e7al\u0131\u015f\u0131r."
+    "message": "Bu listeyi boş bırakırsanız uzantı tüm sitelerde çalışır."
   },
   "allowedSiteLabel": {
-    "message": "Site alan ad\u0131"
+    "message": "Site alan adı"
   },
   "allowedSitePlaceholder": {
-    "message": "or. example.com"
+    "message": "örn. example.com"
   },
   "addButton": {
     "message": "Ekle"
@@ -87,40 +87,40 @@
     "message": "Sil"
   },
   "noAllowedSites": {
-    "message": "\u0130zin verilen site ayarlanmam\u0131\u015f."
+    "message": "İzin verilen site ayarlanmamış."
   },
   "shortcutSettingsTitle": {
-    "message": "K\u0131sayol Metinleri"
+    "message": "Kısayol Metinleri"
   },
   "shortcutHelper": {
-    "message": "Sayfada tetikleyici karakteri ve anahtar\u0131 yazarak kay\u0131tl\u0131 metni geni\u015fletin."
+    "message": "Sayfada tetikleyici karakteri ve anahtarı yazarak kayıtlı metni genişletin."
   },
   "shortcutKeyLabel": {
-    "message": "K\u0131sayol anahtar\u0131"
+    "message": "Kısayol anahtarı"
   },
   "shortcutValueLabel": {
-    "message": "K\u0131sayol metni"
+    "message": "Kısayol metni"
   },
   "shortcutKeyPlaceholder": {
-    "message": "login"
+    "message": "anahtar"
   },
   "shortcutValuePlaceholder": {
-    "message": "Eklenmesini istedi\u011finiz metni girin."
+    "message": "Eklemek istediğiniz metni girin."
   },
   "addShortcutButton": {
-    "message": "K\u0131sayol Ekle"
+    "message": "Kısayol Ekle"
   },
   "noShortcuts": {
-    "message": "K\u0131sayol ayarlanmam\u0131\u015f."
+    "message": "Kısayol ayarlanmamış."
   },
   "typingBehaviorTitle": {
-    "message": "Yazma Davran\u0131\u015f\u0131"
+    "message": "Yazma Davranışı"
   },
   "triggerCharacterLabel": {
     "message": "Tetikleyici karakter"
   },
   "acceptKeyLabel": {
-    "message": "Kabul tu\u015fu"
+    "message": "Kabul tuşu"
   },
   "acceptKeyTab": {
     "message": "Tab"
@@ -129,21 +129,33 @@
     "message": "Enter"
   },
   "acceptKeyArrowRight": {
-    "message": "Sa\u011f Ok"
+    "message": "Sağ Ok"
+  },
+  "languageLabel": {
+    "message": "Dil"
+  },
+  "languageBrowser": {
+    "message": "Tarayıcı Varsayılanı"
+  },
+  "languageEnglish": {
+    "message": "İngilizce"
+  },
+  "languageTurkish": {
+    "message": "Türkçe"
   },
   "dangerZoneTitle": {
-    "message": "Tehlikeli B\u00f6lge"
+    "message": "Tehlikeli Bölge"
   },
   "clearDataHelper": {
-    "message": "T\u00fcm kay\u0131tl\u0131 metinleri, izin verilen siteleri, k\u0131sayollar\u0131 ve yazma tercihlerini silin."
+    "message": "Tüm kayıtlı metinleri, izin verilen siteleri, kısayolları ve yazma tercihlerini silin."
   },
   "clearDataButton": {
-    "message": "Her \u015eeyi Temizle"
+    "message": "Her şeyi Temizle"
   },
   "duplicateSiteAlert": {
     "message": "Bu site zaten listede."
   },
   "duplicateShortcutAlert": {
-    "message": "Bu k\u0131sayol zaten var."
+    "message": "Bu kısayol zaten var."
   }
 }

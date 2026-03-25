@@ -102,7 +102,7 @@
     "message": "Shortcut text"
   },
   "shortcutKeyPlaceholder": {
-    "message": "login"
+    "message": "key"
   },
   "shortcutValuePlaceholder": {
     "message": "Paste the text that should be inserted."
@@ -130,6 +130,18 @@
   },
   "acceptKeyArrowRight": {
     "message": "Right Arrow"
+  },
+  "languageLabel": {
+    "message": "Language"
+  },
+  "languageBrowser": {
+    "message": "Browser Default"
+  },
+  "languageEnglish": {
+    "message": "English"
+  },
+  "languageTurkish": {
+    "message": "Turkish"
   },
   "dangerZoneTitle": {
     "message": "Danger Zone"

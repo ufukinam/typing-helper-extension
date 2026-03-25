@@ -6,6 +6,7 @@ const addAllowedBtn = document.getElementById('addAllowedBtn');
 const allowedList = document.getElementById('allowedList');
 const triggerInput = document.getElementById('triggerCharacter');
 const acceptKeySelect = document.getElementById('acceptKey');
+const languageSelect = document.getElementById('language');
 const shortcutKeyInput = document.getElementById('shortcutKey');
 const shortcutValueInput = document.getElementById('shortcutValue');
 const shortcutList = document.getElementById('shortcutList');
@@ -14,7 +15,10 @@ const clearDataBtn = document.getElementById('clearDataBtn');
 
 let settings = Shared.normalizeSettings({});
 
-Shared.localizeDocument(document);
+function applyLanguage() {
+  Shared.setLanguagePreference(settings.language);
+  Shared.localizeDocument(document, settings.language);
+}
 
 function renderAllowedSites() {
   allowedList.innerHTML = '';
@@ -84,6 +88,7 @@ function renderShortcuts() {
 function renderTypingSettings() {
   triggerInput.value = settings.triggerCharacter;
   acceptKeySelect.value = settings.acceptKey;
+  languageSelect.value = settings.language;
 }
 
 addAllowedBtn.addEventListener('click', () => {
@@ -159,6 +164,16 @@ acceptKeySelect.addEventListener('change', (event) => {
   });
 });
 
+languageSelect.addEventListener('change', (event) => {
+  settingsStore.set({ language: event.target.value }, (nextSettings) => {
+    settings = nextSettings;
+    applyLanguage();
+    renderAllowedSites();
+    renderShortcuts();
+    renderTypingSettings();
+  });
+});
+
 clearDataBtn.addEventListener('click', () => {
   settingsStore.clear((nextSettings) => {
     settings = nextSettings;
@@ -170,6 +185,7 @@ clearDataBtn.addEventListener('click', () => {
 
 settingsStore.get((nextSettings) => {
   settings = nextSettings;
+  applyLanguage();
   renderAllowedSites();
   renderShortcuts();
   renderTypingSettings();

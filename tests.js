@@ -12,13 +12,15 @@ function testNormalizeSettings() {
       ' ': 'noop'
     },
     triggerCharacter: '#',
-    acceptKey: 'Enter'
+    acceptKey: 'Enter',
+    language: 'tr'
   });
 
   assert.deepEqual(settings.sentences, ['Hello', 'World']);
   assert.deepEqual(settings.allowedSites, ['google.com', 'example.com']);
   assert.equal(settings.shortcuts.login, 'B');
   assert.equal(settings.acceptKey, 'Enter');
+  assert.equal(settings.language, 'tr');
 }
 
 function testSiteMatching() {
@@ -46,11 +48,17 @@ function testSentenceMatches() {
 
 function testTurkishNormalization() {
   const matches = Shared.getSentenceMatches(
-    ['İade işlemi gerçekleştirildi, kontrol sağlanabilir.'],
+    ['\u0130ade i\u015flemi ger\u00e7ekle\u015ftirildi, kontrol sa\u011flanabilir.'],
     'iade'
   );
 
-  assert.deepEqual(matches, ['İade işlemi gerçekleştirildi, kontrol sağlanabilir.']);
+  assert.deepEqual(matches, ['\u0130ade i\u015flemi ger\u00e7ekle\u015ftirildi, kontrol sa\u011flanabilir.']);
+}
+
+function testLanguagePreference() {
+  assert.equal(Shared.getEffectiveLanguage('tr'), 'tr');
+  assert.equal(Shared.getEffectiveLanguage('en'), 'en');
+  assert.equal(['en', 'tr'].includes(Shared.getEffectiveLanguage('browser')), true);
 }
 
 function testHistoryStack() {
@@ -69,6 +77,7 @@ testSiteMatching();
 testShortcutMatching();
 testSentenceMatches();
 testTurkishNormalization();
+testLanguagePreference();
 testHistoryStack();
 
 console.log('All tests passed.');

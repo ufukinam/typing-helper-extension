@@ -1,12 +1,127 @@
 (function initTypingHelperShared(global) {
   const ACCEPT_KEYS = ['Tab', 'Enter', 'ArrowRight'];
+  const LANGUAGE_OPTIONS = ['browser', 'en', 'tr'];
   const DEFAULT_SETTINGS = {
     sentences: [],
     allowedSites: [],
     shortcuts: {},
     triggerCharacter: '#',
-    acceptKey: 'Tab'
+    acceptKey: 'Tab',
+    language: 'browser'
   };
+  const MESSAGE_CATALOGS = {
+    en: {
+      extensionName: 'Text Completer',
+      extensionDescription: 'Autocomplete saved texts and shortcut snippets while typing.',
+      popupTitle: 'Text Completer',
+      savedTextsTitle: 'Saved Texts',
+      sentencePlaceholder: 'Enter the text you want to save.',
+      addTextButton: 'Add Text',
+      deleteTextButton: 'Delete text',
+      popupHelperText: 'Use Arrow Up/Down to switch suggestions and your accept key to insert the selected text.',
+      noSentences: 'No saved texts yet.',
+      openSettingsButton: 'Open Settings',
+      currentSiteTitle: 'Current Site',
+      currentSiteHelper: 'When no sites are listed, the extension works on all sites.',
+      currentSiteStatusGlobal: 'All sites are currently enabled.',
+      currentSiteStatusAllowed: 'Autocomplete is enabled on this site.',
+      currentSiteStatusBlocked: 'This site is not in the allowed list.',
+      currentSiteActionRestrict: 'Only This Site',
+      enableCurrentSiteButton: 'Enable Site',
+      disableCurrentSiteButton: 'Disable Site',
+      siteUnavailable: 'Unavailable',
+      siteUnavailableDescription: 'This tab does not expose a website URL.',
+      siteUnavailableAction: 'Unavailable',
+      settingsPageTitle: 'Extension Settings',
+      settingsHelperText: 'Use a trigger character for shortcuts. Suggestions can be switched with Arrow Up/Down and accepted with your selected key.',
+      allowedSitesTitle: 'Allowed Sites',
+      allowedSitesHelper: 'Leave this list empty to enable the extension on all sites.',
+      allowedSiteLabel: 'Site domain',
+      allowedSitePlaceholder: 'example.com',
+      addButton: 'Add',
+      removeButton: 'Remove',
+      noAllowedSites: 'No allowed sites configured.',
+      shortcutSettingsTitle: 'Shortcut Snippets',
+      shortcutHelper: 'Type the trigger character and key in the page to expand the saved text.',
+      shortcutKeyLabel: 'Shortcut key',
+      shortcutValueLabel: 'Shortcut text',
+      shortcutKeyPlaceholder: 'login',
+      shortcutValuePlaceholder: 'Paste the text that should be inserted.',
+      addShortcutButton: 'Add Shortcut',
+      noShortcuts: 'No shortcuts configured.',
+      typingBehaviorTitle: 'Typing Behavior',
+      triggerCharacterLabel: 'Trigger character',
+      acceptKeyLabel: 'Accept key',
+      acceptKeyTab: 'Tab',
+      acceptKeyEnter: 'Enter',
+      acceptKeyArrowRight: 'Right Arrow',
+      languageLabel: 'Language',
+      languageBrowser: 'Browser Default',
+      languageEnglish: 'English',
+      languageTurkish: 'Turkish',
+      dangerZoneTitle: 'Danger Zone',
+      clearDataHelper: 'Remove all saved texts, allowed sites, shortcuts, and typing preferences.',
+      clearDataButton: 'Clear Everything',
+      duplicateSiteAlert: 'This site is already in the list.',
+      duplicateShortcutAlert: 'This shortcut already exists.'
+    },
+    tr: {
+      extensionName: 'Metin Tamamlayıcı',
+      extensionDescription: 'Kayıtlı metinleri ve kısayol metinlerini yazarken otomatik tamamlama ile kullanın.',
+      popupTitle: 'Metin Tamamlayıcı',
+      savedTextsTitle: 'Kayıtlı Metinler',
+      sentencePlaceholder: 'Kaydetmek istediğiniz metni girin.',
+      addTextButton: 'Metin Ekle',
+      deleteTextButton: 'Metni sil',
+      popupHelperText: 'Yukarı/Aşağı Ok ile öneriler arasında geçin ve seçili metni eklemek için kabul tuşunuzu kullanın.',
+      noSentences: 'Henüz kayıtlı metin yok.',
+      openSettingsButton: 'Ayarları Aç',
+      currentSiteTitle: 'Geçerli Site',
+      currentSiteHelper: 'Bu liste boşsa uzantı tüm sitelerde çalışır.',
+      currentSiteStatusGlobal: 'Tüm siteler şu anda etkin.',
+      currentSiteStatusAllowed: 'Bu sitede otomatik tamamlama etkin.',
+      currentSiteStatusBlocked: 'Bu site izin verilenler listesinde değil.',
+      currentSiteActionRestrict: 'Sadece Bu Site',
+      enableCurrentSiteButton: 'Sitede Etkinleştir',
+      disableCurrentSiteButton: 'Sitede Kapat',
+      siteUnavailable: 'Kullanılamıyor',
+      siteUnavailableDescription: 'Bu sekmede erişilebilir bir web sitesi adresi yok.',
+      siteUnavailableAction: 'Kullanılamıyor',
+      settingsPageTitle: 'Uzantı Ayarları',
+      settingsHelperText: 'Kısayollar için bir tetikleyici karakter kullanın. Öneriler arasında Yukarı/Aşağı Ok ile geçebilir ve seçtiğiniz tuş ile kabul edebilirsiniz.',
+      allowedSitesTitle: 'İzin Verilen Siteler',
+      allowedSitesHelper: 'Bu listeyi boş bırakırsanız uzantı tüm sitelerde çalışır.',
+      allowedSiteLabel: 'Site alan adı',
+      allowedSitePlaceholder: 'örn. example.com',
+      addButton: 'Ekle',
+      removeButton: 'Sil',
+      noAllowedSites: 'İzin verilen site ayarlanmamış.',
+      shortcutSettingsTitle: 'Kısayol Metinleri',
+      shortcutHelper: 'Sayfada tetikleyici karakteri ve anahtarı yazarak kayıtlı metni genişletin.',
+      shortcutKeyLabel: 'Kısayol anahtarı',
+      shortcutValueLabel: 'Kısayol metni',
+      shortcutKeyPlaceholder: 'login',
+      shortcutValuePlaceholder: 'Eklenmesini istediğiniz metni girin.',
+      addShortcutButton: 'Kısayol Ekle',
+      noShortcuts: 'Kısayol ayarlanmamış.',
+      typingBehaviorTitle: 'Yazma Davranışı',
+      triggerCharacterLabel: 'Tetikleyici karakter',
+      acceptKeyLabel: 'Kabul tuşu',
+      acceptKeyTab: 'Tab',
+      acceptKeyEnter: 'Enter',
+      acceptKeyArrowRight: 'Sağ Ok',
+      languageLabel: 'Dil',
+      languageBrowser: 'Tarayıcı Varsayılanı',
+      languageEnglish: 'İngilizce',
+      languageTurkish: 'Türkçe',
+      dangerZoneTitle: 'Tehlikeli Bölge',
+      clearDataHelper: 'Tüm kayıtlı metinleri, izin verilen siteleri, kısayolları ve yazma tercihlerini silin.',
+      clearDataButton: 'Her şeyi Temizle',
+      duplicateSiteAlert: 'Bu site zaten listede.',
+      duplicateShortcutAlert: 'Bu kısayol zaten var.'
+    }
+  };
+  let currentLanguagePreference = DEFAULT_SETTINGS.language;
 
   function normalize(value) {
     return (value || '').toLocaleLowerCase('tr-TR');
@@ -38,6 +153,29 @@
 
   function sanitizeAcceptKey(value) {
     return ACCEPT_KEYS.includes(value) ? value : DEFAULT_SETTINGS.acceptKey;
+  }
+
+  function sanitizeLanguage(value) {
+    return LANGUAGE_OPTIONS.includes(value) ? value : DEFAULT_SETTINGS.language;
+  }
+
+  function detectBrowserLanguage() {
+    const browserLanguage =
+      (typeof chrome !== 'undefined' && chrome.i18n?.getUILanguage?.()) ||
+      (typeof navigator !== 'undefined' ? navigator.language : '') ||
+      'en';
+
+    return browserLanguage.toLocaleLowerCase().startsWith('tr') ? 'tr' : 'en';
+  }
+
+  function getEffectiveLanguage(languagePreference = currentLanguagePreference) {
+    const normalizedLanguage = sanitizeLanguage(languagePreference);
+    return normalizedLanguage === 'browser' ? detectBrowserLanguage() : normalizedLanguage;
+  }
+
+  function setLanguagePreference(languagePreference) {
+    currentLanguagePreference = sanitizeLanguage(languagePreference);
+    return getEffectiveLanguage(currentLanguagePreference);
   }
 
   function normalizeShortcutKey(input, triggerCharacter) {
@@ -107,7 +245,8 @@
       allowedSites: normalizeAllowedSites(settings?.allowedSites),
       shortcuts: normalizeShortcutMap(settings?.shortcuts, nextTriggerCharacter),
       triggerCharacter: nextTriggerCharacter,
-      acceptKey: sanitizeAcceptKey(settings?.acceptKey)
+      acceptKey: sanitizeAcceptKey(settings?.acceptKey),
+      language: sanitizeLanguage(settings?.language)
     };
   }
 
@@ -150,27 +289,41 @@
     return '';
   }
 
-  function getMessage(key, substitutions) {
-    if (typeof chrome !== 'undefined' && chrome.i18n?.getMessage) {
-      return chrome.i18n.getMessage(key, substitutions) || key;
+  function getMessage(key, substitutions, languagePreference = currentLanguagePreference) {
+    const language = getEffectiveLanguage(languagePreference);
+    const template = MESSAGE_CATALOGS[language]?.[key] || MESSAGE_CATALOGS.en[key];
+
+    if (!template) {
+      return key;
     }
 
-    return key;
+    if (Array.isArray(substitutions)) {
+      return substitutions.reduce((message, value, index) => {
+        return message.replace(new RegExp(`\\$${index + 1}`, 'g'), value);
+      }, template);
+    }
+
+    return template;
   }
 
-  function localizeDocument(root) {
+  function localizeDocument(root, languagePreference = currentLanguagePreference) {
     const target = root || document;
+    const effectiveLanguage = getEffectiveLanguage(languagePreference);
+
+    if (target.documentElement) {
+      target.documentElement.lang = effectiveLanguage;
+    }
 
     target.querySelectorAll('[data-i18n]').forEach((element) => {
-      element.textContent = getMessage(element.dataset.i18n);
+      element.textContent = getMessage(element.dataset.i18n, undefined, languagePreference);
     });
 
     target.querySelectorAll('[data-i18n-placeholder]').forEach((element) => {
-      element.setAttribute('placeholder', getMessage(element.dataset.i18nPlaceholder));
+      element.setAttribute('placeholder', getMessage(element.dataset.i18nPlaceholder, undefined, languagePreference));
     });
 
     target.querySelectorAll('[data-i18n-title]').forEach((element) => {
-      element.setAttribute('title', getMessage(element.dataset.i18nTitle));
+      element.setAttribute('title', getMessage(element.dataset.i18nTitle, undefined, languagePreference));
     });
   }
 
@@ -283,7 +436,11 @@
     normalizeSettings,
     normalizeShortcutKey,
     normalizeShortcutMap,
-    sanitizeAcceptKey
+    sanitizeAcceptKey,
+    sanitizeLanguage,
+    detectBrowserLanguage,
+    getEffectiveLanguage,
+    setLanguagePreference
   };
 
   global.TypingHelperShared = api;
