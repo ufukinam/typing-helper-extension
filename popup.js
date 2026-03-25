@@ -6,22 +6,22 @@ let sentences = [];
 function render() {
   list.innerHTML = '';
   if (sentences.length === 0) {
-    list.textContent = 'Eklenen cümle yok.';
+    list.textContent = 'Eklenen metin yok.';
     return;
   }
 
-  sentences.forEach((s, i) => {
+  sentences.forEach((sentence, index) => {
     const div = document.createElement('div');
     div.className = 'sentence';
 
     const textSpan = document.createElement('span');
-    textSpan.textContent = s;
+    textSpan.textContent = sentence;
 
     const deleteBtn = document.createElement('button');
     deleteBtn.textContent = 'X';
     deleteBtn.className = 'delete-btn';
     deleteBtn.onclick = () => {
-      sentences.splice(i, 1);
+      sentences.splice(index, 1);
       chrome.storage.sync.set({ sentences });
       render();
     };
@@ -33,10 +33,8 @@ function render() {
 }
 
 chrome.storage.sync.get(['sentences'], (result) => {
-  if (result.sentences) {
-    sentences = result.sentences;
-    render();
-  }
+  sentences = result.sentences || [];
+  render();
 });
 
 addBtn.onclick = () => {
@@ -48,3 +46,10 @@ addBtn.onclick = () => {
     sentenceInput.value = '';
   }
 };
+
+sentenceInput.addEventListener('keydown', (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+    event.preventDefault();
+    addBtn.click();
+  }
+});

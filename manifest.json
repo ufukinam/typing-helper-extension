@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Metin Tamamlayıcı",
+  "name": "__MSG_extensionName__",
   "version": "1.1.1",
   "default_locale": "en",
-  "description": "Kayıtlı metinlerden yazıyı tamamlar.",
-  "permissions": ["storage", "scripting"],
+  "description": "__MSG_extensionDescription__",
+  "permissions": ["storage"],
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
@@ -20,12 +20,11 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": ["http://*/*", "https://*/*"],
       "js": ["content.js"],
       "run_at": "document_idle",
       "all_frames": true
     }
   ],
-  "host_permissions": ["<all_urls>"],
   "options_page": "settings.html"
 }
