@@ -1,135 +1,107 @@
+const Shared = globalThis.TypingHelperShared;
+const settingsStore = Shared.createSettingsStore(chrome.storage.sync);
+
 const allowedInput = document.getElementById('allowedInput');
 const addAllowedBtn = document.getElementById('addAllowedBtn');
 const allowedList = document.getElementById('allowedList');
 const triggerInput = document.getElementById('triggerCharacter');
+const acceptKeySelect = document.getElementById('acceptKey');
+const shortcutKeyInput = document.getElementById('shortcutKey');
+const shortcutValueInput = document.getElementById('shortcutValue');
+const shortcutList = document.getElementById('shortcutList');
+const addShortcutBtn = document.getElementById('addShortcutBtn');
+const clearDataBtn = document.getElementById('clearDataBtn');
 
-const normalize = str => (str || '').toLocaleLowerCase();
+let settings = Shared.normalizeSettings({});
 
-function getTriggerCharacter(value = triggerInput.value) {
-  const trimmed = (value || '').trim();
-  return trimmed ? trimmed.charAt(0) : '#';
-}
+Shared.localizeDocument(document);
 
-function normalizeDomain(input) {
-  const trimmed = (input || '').trim();
-  if (!trimmed) return '';
-
-  try {
-    let value = trimmed;
-    if (!value.startsWith('http')) value = `https://${value}`;
-    const url = new URL(value);
-    return url.hostname.replace(/^www\./, '');
-  } catch (error) {
-    return trimmed
-      .toLowerCase()
-      .replace(/^https?:\/\//, '')
-      .replace(/^www\./, '')
-      .split('/')[0];
-  }
-}
-
-function normalizeShortcutKey(input, triggerCharacter) {
-  let key = normalize((input || '').trim());
-  if (!key) return '';
-
-  const normalizedTrigger = normalize(triggerCharacter);
-  if (normalizedTrigger && key.startsWith(normalizedTrigger)) {
-    key = key.slice(normalizedTrigger.length);
-  }
-
-  return key;
-}
-
-function normalizeShortcutMap(shortcuts, triggerCharacter) {
-  const normalizedShortcuts = {};
-
-  for (const [rawKey, rawValue] of Object.entries(shortcuts || {})) {
-    const value = typeof rawValue === 'string' ? rawValue.trim() : '';
-    const key = normalizeShortcutKey(rawKey, triggerCharacter);
-
-    if (key && value) {
-      normalizedShortcuts[key] = value;
-    }
-  }
-
-  return normalizedShortcuts;
-}
-
-function renderAllowedSites(sites) {
+function renderAllowedSites() {
   allowedList.innerHTML = '';
 
-  if (sites.length === 0) {
-    const li = document.createElement('li');
-    li.textContent = 'Izin verilen site yok.';
-    allowedList.appendChild(li);
+  if (!settings.allowedSites.length) {
+    const item = document.createElement('li');
+    item.textContent = Shared.getMessage('noAllowedSites');
+    allowedList.appendChild(item);
     return;
   }
 
-  sites.forEach((site, index) => {
-    const li = document.createElement('li');
-    li.textContent = site;
+  settings.allowedSites.forEach((site) => {
+    const item = document.createElement('li');
+    item.textContent = site;
 
     const removeBtn = document.createElement('button');
-    removeBtn.textContent = 'X';
+    removeBtn.type = 'button';
     removeBtn.className = 'remove-btn';
-    removeBtn.onclick = () => {
-      sites.splice(index, 1);
-      chrome.storage.sync.set({ allowedSites: sites }, () => renderAllowedSites(sites));
-    };
+    removeBtn.textContent = Shared.getMessage('removeButton');
+    removeBtn.addEventListener('click', () => {
+      const allowedSites = settings.allowedSites.filter((value) => value !== site);
+      settingsStore.set({ allowedSites }, (nextSettings) => {
+        settings = nextSettings;
+        renderAllowedSites();
+      });
+    });
 
-    li.appendChild(removeBtn);
-    allowedList.appendChild(li);
+    item.appendChild(removeBtn);
+    allowedList.appendChild(item);
   });
 }
 
-function renderShortcuts(shortcuts) {
-  const list = document.getElementById('shortcutList');
-  const triggerCharacter = getTriggerCharacter();
+function renderShortcuts() {
+  shortcutList.innerHTML = '';
 
-  list.innerHTML = '';
-
-  if (Object.keys(shortcuts).length === 0) {
-    const li = document.createElement('li');
-    li.textContent = 'Kisayol yok.';
-    list.appendChild(li);
+  const entries = Object.entries(settings.shortcuts);
+  if (!entries.length) {
+    const item = document.createElement('li');
+    item.textContent = Shared.getMessage('noShortcuts');
+    shortcutList.appendChild(item);
     return;
   }
 
-  for (const [key, value] of Object.entries(shortcuts)) {
-    const li = document.createElement('li');
-    li.textContent = `${triggerCharacter}${key} -> ${value}`;
+  entries.forEach(([key, value]) => {
+    const item = document.createElement('li');
+    item.textContent = `${settings.triggerCharacter}${key} -> ${value}`;
 
-    const del = document.createElement('button');
-    del.textContent = 'X';
-    del.className = 'remove-btn';
-    del.onclick = () => {
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'remove-btn';
+    removeBtn.textContent = Shared.getMessage('removeButton');
+    removeBtn.addEventListener('click', () => {
+      const shortcuts = { ...settings.shortcuts };
       delete shortcuts[key];
-      chrome.storage.sync.set({ shortcuts }, () => renderShortcuts(shortcuts));
-    };
 
-    li.appendChild(del);
-    list.appendChild(li);
-  }
+      settingsStore.set({ shortcuts }, (nextSettings) => {
+        settings = nextSettings;
+        renderShortcuts();
+      });
+    });
+
+    item.appendChild(removeBtn);
+    shortcutList.appendChild(item);
+  });
+}
+
+function renderTypingSettings() {
+  triggerInput.value = settings.triggerCharacter;
+  acceptKeySelect.value = settings.acceptKey;
 }
 
 addAllowedBtn.addEventListener('click', () => {
-  const newSite = normalizeDomain(allowedInput.value);
-  if (!newSite) return;
+  const site = Shared.normalizeDomain(allowedInput.value);
+  if (!site) {
+    return;
+  }
 
-  chrome.storage.sync.get(['allowedSites'], (result) => {
-    const sites = result.allowedSites || [];
+  if (settings.allowedSites.includes(site)) {
+    alert(Shared.getMessage('duplicateSiteAlert'));
+    allowedInput.value = '';
+    return;
+  }
 
-    if (sites.some(site => normalizeDomain(site) === newSite)) {
-      alert('Bu site zaten listede.');
-      allowedInput.value = '';
-      return;
-    }
-
-    sites.push(newSite);
-    chrome.storage.sync.set({ allowedSites: sites }, () => {
-      renderAllowedSites(sites);
-      allowedInput.value = '';
-    });
+  settingsStore.set({ allowedSites: [...settings.allowedSites, site] }, (nextSettings) => {
+    settings = nextSettings;
+    allowedInput.value = '';
+    renderAllowedSites();
   });
 });
 
@@ -140,60 +112,65 @@ allowedInput.addEventListener('keydown', (event) => {
   }
 });
 
-document.getElementById('addShortcutBtn').onclick = () => {
-  const keyInput = document.getElementById('shortcutKey');
-  const valueInput = document.getElementById('shortcutValue');
-  const triggerCharacter = getTriggerCharacter();
-  const key = normalizeShortcutKey(keyInput.value, triggerCharacter);
-  const value = valueInput.value.trim();
+addShortcutBtn.addEventListener('click', () => {
+  const key = Shared.normalizeShortcutKey(shortcutKeyInput.value, settings.triggerCharacter);
+  const value = shortcutValueInput.value.trim();
 
-  if (!key || !value) return;
+  if (!key || !value) {
+    return;
+  }
 
-  chrome.storage.sync.get(['shortcuts'], (result) => {
-    const shortcuts = normalizeShortcutMap(result.shortcuts || {}, triggerCharacter);
+  if (settings.shortcuts[key]) {
+    alert(Shared.getMessage('duplicateShortcutAlert'));
+    return;
+  }
 
-    if (shortcuts[key]) {
-      alert('Bu kisayol zaten var.');
-      return;
+  settingsStore.set({
+    shortcuts: {
+      ...settings.shortcuts,
+      [key]: value
     }
-
-    shortcuts[key] = value;
-    chrome.storage.sync.set({ shortcuts }, () => {
-      renderShortcuts(shortcuts);
-      keyInput.value = '';
-      valueInput.value = '';
-    });
-  });
-};
-
-document.getElementById('clearDataBtn').onclick = () => {
-  chrome.storage.sync.clear(() => {
-    triggerInput.value = '#';
-    renderAllowedSites([]);
-    renderShortcuts({});
-  });
-};
-
-triggerInput.addEventListener('input', (event) => {
-  const triggerCharacter = getTriggerCharacter(event.target.value);
-  event.target.value = triggerCharacter;
-
-  chrome.storage.sync.set({ triggerCharacter }, () => {
-    chrome.storage.sync.get(['shortcuts'], (result) => {
-      renderShortcuts(normalizeShortcutMap(result.shortcuts || {}, triggerCharacter));
-    });
+  }, (nextSettings) => {
+    settings = nextSettings;
+    shortcutKeyInput.value = '';
+    shortcutValueInput.value = '';
+    renderShortcuts();
   });
 });
 
-chrome.storage.sync.get(['allowedSites', 'shortcuts', 'triggerCharacter'], (result) => {
-  const triggerCharacter = getTriggerCharacter(result.triggerCharacter);
-  const shortcuts = normalizeShortcutMap(result.shortcuts || {}, triggerCharacter);
+triggerInput.addEventListener('input', (event) => {
+  const triggerCharacter = Shared.getTriggerCharacter(event.target.value);
+  event.target.value = triggerCharacter;
 
-  triggerInput.value = triggerCharacter;
-  renderAllowedSites(result.allowedSites || []);
-  renderShortcuts(shortcuts);
+  settingsStore.set({
+    triggerCharacter,
+    shortcuts: settings.shortcuts
+  }, (nextSettings) => {
+    settings = nextSettings;
+    renderShortcuts();
+    renderTypingSettings();
+  });
+});
 
-  if (JSON.stringify(shortcuts) !== JSON.stringify(result.shortcuts || {})) {
-    chrome.storage.sync.set({ shortcuts });
-  }
+acceptKeySelect.addEventListener('change', (event) => {
+  settingsStore.set({ acceptKey: event.target.value }, (nextSettings) => {
+    settings = nextSettings;
+    renderTypingSettings();
+  });
+});
+
+clearDataBtn.addEventListener('click', () => {
+  settingsStore.clear((nextSettings) => {
+    settings = nextSettings;
+    renderAllowedSites();
+    renderShortcuts();
+    renderTypingSettings();
+  });
+});
+
+settingsStore.get((nextSettings) => {
+  settings = nextSettings;
+  renderAllowedSites();
+  renderShortcuts();
+  renderTypingSettings();
 });

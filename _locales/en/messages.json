@@ -3,30 +3,147 @@
     "message": "Text Completer"
   },
   "extensionDescription": {
-    "message": "Suggests text completions from saved texts."
+    "message": "Autocomplete saved texts and shortcut snippets while typing."
   },
-  "savedTexts": {
+  "popupTitle": {
+    "message": "Text Completer"
+  },
+  "savedTextsTitle": {
     "message": "Saved Texts"
   },
-  "addSentenceText": {
+  "sentencePlaceholder": {
+    "message": "Enter the text you want to save."
+  },
+  "addTextButton": {
     "message": "Add Text"
   },
-  "allowedWebsites": {
-    "message": "Allowed Websites"
+  "deleteTextButton": {
+    "message": "Delete text"
   },
-  "addAllowedText": {
-    "message": "Add"
-  },
-  "settingsText": {
-    "message": "Settings"
-  },
-  "exAllowedText": {
-    "message": "ex. google.com"
+  "popupHelperText": {
+    "message": "Use Arrow Up/Down to switch suggestions and your accept key to insert the selected text."
   },
   "noSentences": {
-    "message": "No sentences added."
+    "message": "No saved texts yet."
+  },
+  "openSettingsButton": {
+    "message": "Open Settings"
+  },
+  "currentSiteTitle": {
+    "message": "Current Site"
+  },
+  "currentSiteHelper": {
+    "message": "When no sites are listed, the extension works on all sites."
+  },
+  "currentSiteStatusGlobal": {
+    "message": "All sites are currently enabled."
+  },
+  "currentSiteStatusAllowed": {
+    "message": "Autocomplete is enabled on this site."
+  },
+  "currentSiteStatusBlocked": {
+    "message": "This site is not in the allowed list."
+  },
+  "currentSiteActionRestrict": {
+    "message": "Only This Site"
+  },
+  "enableCurrentSiteButton": {
+    "message": "Enable Site"
+  },
+  "disableCurrentSiteButton": {
+    "message": "Disable Site"
+  },
+  "siteUnavailable": {
+    "message": "Unavailable"
+  },
+  "siteUnavailableDescription": {
+    "message": "This tab does not expose a website URL."
+  },
+  "siteUnavailableAction": {
+    "message": "Unavailable"
+  },
+  "settingsPageTitle": {
+    "message": "Extension Settings"
+  },
+  "settingsHelperText": {
+    "message": "Use a trigger character for shortcuts. Suggestions can be switched with Arrow Up/Down and accepted with your selected key."
+  },
+  "allowedSitesTitle": {
+    "message": "Allowed Sites"
+  },
+  "allowedSitesHelper": {
+    "message": "Leave this list empty to enable the extension on all sites."
+  },
+  "allowedSiteLabel": {
+    "message": "Site domain"
+  },
+  "allowedSitePlaceholder": {
+    "message": "example.com"
+  },
+  "addButton": {
+    "message": "Add"
+  },
+  "removeButton": {
+    "message": "Remove"
   },
   "noAllowedSites": {
-    "message": "No allowed sites."
+    "message": "No allowed sites configured."
+  },
+  "shortcutSettingsTitle": {
+    "message": "Shortcut Snippets"
+  },
+  "shortcutHelper": {
+    "message": "Type the trigger character and key in the page to expand the saved text."
+  },
+  "shortcutKeyLabel": {
+    "message": "Shortcut key"
+  },
+  "shortcutValueLabel": {
+    "message": "Shortcut text"
+  },
+  "shortcutKeyPlaceholder": {
+    "message": "login"
+  },
+  "shortcutValuePlaceholder": {
+    "message": "Paste the text that should be inserted."
+  },
+  "addShortcutButton": {
+    "message": "Add Shortcut"
+  },
+  "noShortcuts": {
+    "message": "No shortcuts configured."
+  },
+  "typingBehaviorTitle": {
+    "message": "Typing Behavior"
+  },
+  "triggerCharacterLabel": {
+    "message": "Trigger character"
+  },
+  "acceptKeyLabel": {
+    "message": "Accept key"
+  },
+  "acceptKeyTab": {
+    "message": "Tab"
+  },
+  "acceptKeyEnter": {
+    "message": "Enter"
+  },
+  "acceptKeyArrowRight": {
+    "message": "Right Arrow"
+  },
+  "dangerZoneTitle": {
+    "message": "Danger Zone"
+  },
+  "clearDataHelper": {
+    "message": "Remove all saved texts, allowed sites, shortcuts, and typing preferences."
+  },
+  "clearDataButton": {
+    "message": "Clear Everything"
+  },
+  "duplicateSiteAlert": {
+    "message": "This site is already in the list."
+  },
+  "duplicateShortcutAlert": {
+    "message": "This shortcut already exists."
   }
 }

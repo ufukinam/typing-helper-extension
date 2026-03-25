@@ -1,787 +1,750 @@
-let suggestion = '';
-let suggestionMatches = [];
-let suggestionIndex = 0;
-let suggestionTarget = null;
-let sentences = [];
-let shortcuts = {};
-let allowedSites = [];
-let triggerCharacter = '#';
+(function initContentScript() {
+  const Shared = globalThis.TypingHelperShared;
+  const settingsStore = Shared.createSettingsStore(chrome.storage.sync);
+  const hostname = window.location.hostname.toLowerCase();
+  const controllers = new WeakMap();
+  const textInputTypes = new Set(['', 'text', 'search', 'url', 'tel', 'email']);
+  const MAX_VISIBLE_SUGGESTIONS = 5;
 
-const hostname = window.location.hostname.toLowerCase();
-const wiredInputs = new WeakSet();
-const wiredEditables = new WeakSet();
-const inputHistoryState = new WeakMap();
+  let settings = Shared.normalizeSettings({});
+  let activeController = null;
 
-const normalize = str => (str || '').toLocaleLowerCase();
+  function hasPageManagedAutocomplete(element) {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
 
-function normalizeDomain(input) {
-  const trimmed = (input || '').trim().toLowerCase();
-  if (!trimmed) return '';
+    if (element.dataset.autoComplete === 'true') {
+      return true;
+    }
 
-  return trimmed
-    .replace(/^https?:\/\//, '')
-    .replace(/^www\./, '')
-    .split('/')[0];
-}
+    if (element.hasAttribute('list')) {
+      return true;
+    }
 
-function applySettings(result) {
-  if (Object.prototype.hasOwnProperty.call(result, 'sentences')) {
-    sentences = Array.isArray(result.sentences) ? result.sentences.filter(Boolean) : [];
-  }
+    const ariaAutocomplete = (element.getAttribute('aria-autocomplete') || '').toLowerCase();
+    if (ariaAutocomplete && ariaAutocomplete !== 'none') {
+      return true;
+    }
 
-  if (Object.prototype.hasOwnProperty.call(result, 'allowedSites')) {
-    allowedSites = Array.isArray(result.allowedSites)
-      ? result.allowedSites.map(normalizeDomain).filter(Boolean)
-      : [];
-  }
+    if ((element.getAttribute('role') || '').toLowerCase() === 'combobox') {
+      return true;
+    }
 
-  if (Object.prototype.hasOwnProperty.call(result, 'shortcuts')) {
-    shortcuts = typeof result.shortcuts === 'object' && result.shortcuts !== null
-      ? result.shortcuts
-      : {};
-  }
-
-  if (Object.prototype.hasOwnProperty.call(result, 'triggerCharacter')) {
-    const nextTrigger = typeof result.triggerCharacter === 'string' ? result.triggerCharacter.trim() : '';
-    triggerCharacter = nextTrigger ? nextTrigger.charAt(0) : '#';
-  }
-}
-
-function isSiteAllowed() {
-  if (allowedSites.length === 0) {
-    return true;
-  }
-
-  return allowedSites.some(site => hostname === site || hostname.endsWith(`.${site}`));
-}
-
-function isSupportedInput(input) {
-  if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) {
     return false;
   }
 
-  if (input.readOnly || input.disabled) {
-    return false;
+  function isSupportedInput(element) {
+    if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
+      return false;
+    }
+
+    if (element.readOnly || element.disabled) {
+      return false;
+    }
+
+    if (element instanceof HTMLTextAreaElement) {
+      return true;
+    }
+
+    if (hasPageManagedAutocomplete(element)) {
+      return false;
+    }
+
+    return textInputTypes.has((element.type || '').toLowerCase());
   }
 
-  if (input instanceof HTMLTextAreaElement) {
-    return true;
+  function isSupportedEditable(element) {
+    return Boolean(element?.isContentEditable);
   }
 
-  return ['', 'text', 'search', 'url', 'tel', 'email'].includes((input.type || '').toLowerCase());
-}
+  function getController(element) {
+    if (!controllers.has(element)) {
+      const adapter = isSupportedInput(element)
+        ? new InputAdapter(element)
+        : new EditableAdapter(element);
 
-function clearSuggestionState(target = null) {
-  suggestion = '';
-  suggestionMatches = [];
-  suggestionIndex = 0;
-  suggestionTarget = target;
-}
+      controllers.set(element, new FieldController(adapter));
+    }
 
-function getSentenceMatches(value) {
-  const normalizedValue = normalize(value);
-  if (!normalizedValue) {
-    return [];
+    return controllers.get(element);
   }
 
-  return sentences.filter(sentence => normalize(sentence).startsWith(normalizedValue));
-}
-
-function setSuggestionMatches(target, matches) {
-  suggestionTarget = target;
-  suggestionMatches = matches;
-  suggestionIndex = 0;
-  suggestion = matches[0] || '';
-}
-
-function cycleSuggestion(target, direction) {
-  if (suggestionTarget !== target || suggestionMatches.length === 0) {
-    return '';
-  }
-
-  suggestionIndex = (suggestionIndex + direction + suggestionMatches.length) % suggestionMatches.length;
-  suggestion = suggestionMatches[suggestionIndex] || '';
-  return suggestion;
-}
-
-function hasMultipleSuggestions(target) {
-  return suggestionTarget === target && suggestionMatches.length > 1;
-}
-
-function isUndoShortcut(event) {
-  return (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z';
-}
-
-function setInputValue(input, value) {
-  const prototype = input instanceof HTMLTextAreaElement
-    ? HTMLTextAreaElement.prototype
-    : HTMLInputElement.prototype;
-  const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
-
-  if (descriptor?.set) {
-    descriptor.set.call(input, value);
-  } else {
-    input.value = value;
-  }
-}
-
-function getInputSnapshot(input) {
-  const value = input.value || '';
-  const start = input.selectionStart ?? value.length;
-  const end = input.selectionEnd ?? value.length;
-
-  return { value, start, end };
-}
-
-function snapshotsEqual(left, right) {
-  return Boolean(left) &&
-    Boolean(right) &&
-    left.value === right.value &&
-    left.start === right.start &&
-    left.end === right.end;
-}
-
-function getInputHistory(input) {
-  let history = inputHistoryState.get(input);
-  if (!history) {
-    history = {
-      snapshots: [],
-      pointer: -1,
-      isRestoring: false
-    };
-    inputHistoryState.set(input, history);
-  }
-
-  return history;
-}
-
-function pushInputSnapshot(input) {
-  const history = getInputHistory(input);
-  if (history.isRestoring) {
-    return;
-  }
-
-  const snapshot = getInputSnapshot(input);
-  const current = history.snapshots[history.pointer];
-  if (snapshotsEqual(current, snapshot)) {
-    return;
-  }
-
-  history.snapshots = history.snapshots.slice(0, history.pointer + 1);
-  history.snapshots.push(snapshot);
-
-  if (history.snapshots.length > 100) {
-    history.snapshots.shift();
-  }
-
-  history.pointer = history.snapshots.length - 1;
-}
-
-function restoreInputSnapshot(input, snapshot) {
-  const history = getInputHistory(input);
-  history.isRestoring = true;
-
-  setInputValue(input, snapshot.value);
-  input.setSelectionRange(snapshot.start, snapshot.end);
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-
-  history.isRestoring = false;
-}
-
-function undoInputHistory(input) {
-  const history = getInputHistory(input);
-  if (history.pointer <= 0) {
-    return false;
-  }
-
-  history.pointer -= 1;
-  restoreInputSnapshot(input, history.snapshots[history.pointer]);
-  return true;
-}
-
-function findShortcutExpansion(lastWord) {
-  const normalizedWord = normalize(lastWord);
-  if (!normalizedWord) {
-    return '';
-  }
-
-  const normalizedTrigger = normalize(triggerCharacter);
-  if (!normalizedTrigger || !normalizedWord.startsWith(normalizedTrigger)) {
-    return '';
-  }
-
-  const normalizedShortcutKey = normalizedWord.slice(normalizedTrigger.length);
-  if (!normalizedShortcutKey) {
-    return '';
-  }
-
-  for (const [key, value] of Object.entries(shortcuts)) {
-    const normalizedKey = normalize(key);
-    if (normalizedShortcutKey === normalizedKey) {
-      return value;
+  function refreshActiveController() {
+    if (activeController) {
+      activeController.refresh();
     }
   }
 
-  return '';
-}
+  class BaseAdapter {
+    constructor(element) {
+      this.element = element;
+    }
 
-function triggerActiveElementRefresh() {
-  const activeElement = document.activeElement;
-  if (!activeElement || !isSiteAllowed()) {
-    clearSuggestionState();
-    return;
-  }
+    isFocused() {
+      return document.activeElement === this.element;
+    }
 
-  activeElement.dispatchEvent(new Event('input', { bubbles: true }));
-}
+    getParent() {
+      return this.element.parentElement;
+    }
 
-function activateAutocomplete() {
-  function cloneInputStyles(source, target) {
-    const style = getComputedStyle(source);
-    for (const prop of [
-      'font',
-      'fontSize',
-      'padding',
-      'margin',
-      'border',
-      'outline',
-      'boxSizing',
-      'width',
-      'height',
-      'lineHeight',
-      'letterSpacing',
-      'textAlign',
-      'borderRadius',
-      'boxShadow',
-      'backgroundColor',
-      'color',
-      'whiteSpace'
-    ]) {
-      target.style[prop] = style[prop];
+    applyOverlayStyles() {
+      const parent = this.getParent();
+      const originalStyles = {
+        elementPosition: this.element.style.position,
+        elementZIndex: this.element.style.zIndex,
+        elementBackground: this.element.style.background,
+        elementBackgroundColor: this.element.style.backgroundColor,
+        parentPosition: parent ? parent.style.position : ''
+      };
+
+      if (parent && getComputedStyle(parent).position === 'static') {
+        parent.style.position = 'relative';
+      }
+
+      if (getComputedStyle(this.element).position === 'static') {
+        this.element.style.position = 'relative';
+      }
+
+      this.element.style.zIndex = '10000';
+      this.element.style.background = 'transparent';
+      this.element.style.backgroundColor = 'transparent';
+
+      return originalStyles;
+    }
+
+    restoreOverlayStyles(originalStyles) {
+      const parent = this.getParent();
+      this.element.style.position = originalStyles.elementPosition;
+      this.element.style.zIndex = originalStyles.elementZIndex;
+      this.element.style.background = originalStyles.elementBackground;
+      this.element.style.backgroundColor = originalStyles.elementBackgroundColor;
+
+      if (parent) {
+        parent.style.position = originalStyles.parentPosition;
+      }
     }
   }
 
-  function clearGhostValue(ghost) {
-    if (ghost instanceof HTMLInputElement || ghost instanceof HTMLTextAreaElement) {
+  class InputAdapter extends BaseAdapter {
+    constructor(element) {
+      super(element);
+      this.history = new Shared.SnapshotHistory(100);
+      this.isRestoringHistory = false;
+    }
+
+    getValue() {
+      return this.element.value || '';
+    }
+
+    getLastWord() {
+      const words = this.getValue().split(/\s+/);
+      return words[words.length - 1] || '';
+    }
+
+    createGhost() {
+      const ghost = document.createElement(this.element.tagName === 'TEXTAREA' ? 'textarea' : 'input');
+      const style = getComputedStyle(this.element);
+
+      ghost.disabled = true;
+      ghost.tabIndex = -1;
+      ghost.setAttribute('aria-hidden', 'true');
+      ghost.className = 'autocomplete-ghost';
+      ghost.style.position = 'absolute';
+      ghost.style.zIndex = '9999';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.background = 'transparent';
+      ghost.style.borderColor = 'transparent';
+      ghost.style.resize = 'none';
+      ghost.style.overflow = 'hidden';
+
+      for (const prop of [
+        'font',
+        'fontSize',
+        'padding',
+        'margin',
+        'border',
+        'outline',
+        'boxSizing',
+        'width',
+        'height',
+        'lineHeight',
+        'letterSpacing',
+        'textAlign',
+        'borderRadius',
+        'boxShadow',
+        'backgroundColor',
+        'color',
+        'whiteSpace'
+      ]) {
+        ghost.style[prop] = style[prop];
+      }
+
+      const rgb = style.color.match(/\d+/g);
+      if (rgb) {
+        ghost.style.color = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.3)`;
+      }
+
+      return ghost;
+    }
+
+    setGhostValue(ghost, value) {
+      ghost.value = value;
+    }
+
+    clearGhostValue(ghost) {
       ghost.value = '';
-    } else {
-      ghost.textContent = '';
-    }
-  }
-
-  function createOverlay(input) {
-    if (input.dataset.hasHintOverlay === 'true' || !isSiteAllowed()) return;
-    input.dataset.hasHintOverlay = 'true';
-
-    const ghost = document.createElement(input.tagName === 'TEXTAREA' ? 'textarea' : 'input');
-    ghost.disabled = true;
-    ghost.tabIndex = -1;
-    ghost.setAttribute('aria-hidden', 'true');
-    ghost.className = 'autocomplete-ghost';
-    ghost.style.position = 'absolute';
-    ghost.style.zIndex = '9999';
-    ghost.style.pointerEvents = 'none';
-    ghost.style.background = 'transparent';
-    ghost.style.borderColor = 'transparent';
-    ghost.style.resize = 'none';
-    ghost.style.overflow = 'hidden';
-
-    cloneInputStyles(input, ghost);
-
-    const originalColor = getComputedStyle(input).color;
-    const rgb = originalColor.match(/\d+/g);
-    if (rgb) {
-      ghost.style.color = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.3)`;
     }
 
-    const parent = input.parentNode;
-    if (!parent) return;
-
-    parent.insertBefore(ghost, input);
-
-    const originalStyles = {
-      inputPosition: input.style.position,
-      inputZIndex: input.style.zIndex,
-      inputBackground: input.style.background,
-      inputBackgroundColor: input.style.backgroundColor,
-      parentPosition: parent.style.position
-    };
-
-    if (getComputedStyle(parent).position === 'static') {
-      parent.style.position = 'relative';
+    createSuggestionList() {
+      return createSuggestionListElement();
     }
 
-    if (getComputedStyle(input).position === 'static') {
-      input.style.position = 'relative';
+    getSnapshot() {
+      const value = this.getValue();
+      return {
+        value,
+        start: this.element.selectionStart ?? value.length,
+        end: this.element.selectionEnd ?? value.length
+      };
     }
 
-    input.style.zIndex = '10000';
-    input.style.background = 'transparent';
-    input.style.backgroundColor = 'transparent';
-
-    function updateGhostPosition() {
-      if (!ghost.isConnected || !input.isConnected) return;
-
-      const rect = input.getBoundingClientRect();
-      const parentRect = parent.getBoundingClientRect();
-      ghost.style.top = `${rect.top - parentRect.top + parent.scrollTop}px`;
-      ghost.style.left = `${rect.left - parentRect.left + parent.scrollLeft}px`;
-      ghost.style.width = `${rect.width}px`;
-      ghost.style.height = `${rect.height}px`;
+    rememberSnapshot() {
+      if (!this.isRestoringHistory) {
+        this.history.push(this.getSnapshot());
+      }
     }
 
-    function cleanupGhost() {
-      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
-      window.removeEventListener('scroll', updateGhostPosition, true);
-      window.removeEventListener('resize', updateGhostPosition);
-      input.removeEventListener('scroll', updateGhostPosition);
+    undo() {
+      const snapshot = this.history.undo();
+      if (!snapshot) {
+        return false;
+      }
 
-      input.style.position = originalStyles.inputPosition;
-      input.style.zIndex = originalStyles.inputZIndex;
-      input.style.background = originalStyles.inputBackground;
-      input.style.backgroundColor = originalStyles.inputBackgroundColor;
-      parent.style.position = originalStyles.parentPosition;
-
-      input.dataset.hasHintOverlay = '';
-      input._autocompleteGhost = null;
-      input._autocompleteUpdateGhostPosition = null;
-      clearSuggestionState();
+      this.isRestoringHistory = true;
+      setFormControlValue(this.element, snapshot.value);
+      this.element.setSelectionRange(snapshot.start, snapshot.end);
+      this.element.dispatchEvent(new Event('input', { bubbles: true }));
+      this.isRestoringHistory = false;
+      return true;
     }
 
-    input._autocompleteCleanup = cleanupGhost;
-    input._autocompleteGhost = ghost;
-    input._autocompleteUpdateGhostPosition = updateGhostPosition;
+    tryExpandShortcut(shortcutText) {
+      const start = this.element.selectionStart;
+      const end = this.element.selectionEnd;
+      const lastWord = this.getLastWord();
 
-    updateGhostPosition();
-    window.addEventListener('scroll', updateGhostPosition, true);
-    window.addEventListener('resize', updateGhostPosition);
-    input.addEventListener('scroll', updateGhostPosition);
+      if (start === null || end === null || !lastWord) {
+        return false;
+      }
 
-    if (!input._autocompleteHandlersAttached) {
-      input._autocompleteHandlersAttached = true;
+      const replaceStart = start - lastWord.length;
+      if (replaceStart < 0) {
+        return false;
+      }
 
-      input.addEventListener('input', () => {
-        const currentGhost = input._autocompleteGhost;
-        if (!currentGhost) return;
-        pushInputSnapshot(input);
+      this.element.focus();
+      this.element.setSelectionRange(replaceStart, end);
 
-        if (!isSiteAllowed()) {
-          clearGhostValue(currentGhost);
-          clearSuggestionState();
-          return;
-        }
+      const inserted = typeof document.execCommand === 'function' &&
+        document.execCommand('insertText', false, shortcutText);
 
-        input._autocompleteUpdateGhostPosition?.();
-        const value = input.value || '';
+      if (!inserted) {
+        const before = this.getValue().slice(0, replaceStart);
+        const after = this.getValue().slice(end);
+        setFormControlValue(this.element, `${before}${shortcutText}${after}`);
+        const cursorPos = before.length + shortcutText.length;
+        this.element.setSelectionRange(cursorPos, cursorPos);
+        this.element.dispatchEvent(new InputEvent('input', {
+          inputType: 'insertReplacementText',
+          data: shortcutText,
+          bubbles: true,
+          cancelable: true
+        }));
+      }
 
-        if (!value.trim()) {
-          clearGhostValue(currentGhost);
-          clearSuggestionState(input);
-          return;
-        }
-
-        const words = value.split(/\s+/);
-        const lastWord = words[words.length - 1];
-        const fullText = findShortcutExpansion(lastWord);
-
-        if (fullText) {
-          const start = input.selectionStart;
-          const end = input.selectionEnd;
-          if (start !== null && end !== null) {
-            const replaceStart = start - lastWord.length;
-            if (replaceStart >= 0) {
-              input.focus();
-              input.setSelectionRange(replaceStart, end);
-
-              const inserted = typeof document.execCommand === 'function' &&
-                document.execCommand('insertText', false, fullText);
-
-              if (!inserted) {
-                const before = input.value.slice(0, replaceStart);
-                const after = input.value.slice(end);
-                input.value = before + fullText + after;
-                const cursorPos = before.length + fullText.length;
-                input.setSelectionRange(cursorPos, cursorPos);
-                input.dispatchEvent(new InputEvent('input', {
-                  inputType: 'insertReplacementText',
-                  data: fullText,
-                  bubbles: true,
-                  cancelable: true
-                }));
-              }
-
-              clearGhostValue(currentGhost);
-              clearSuggestionState(input);
-              return;
-            }
-          }
-        }
-
-        const matches = getSentenceMatches(value).filter(match => normalize(match) !== normalize(value));
-        if (matches.length > 0) {
-          setSuggestionMatches(input, matches);
-          currentGhost.value = suggestion;
-        } else {
-          clearGhostValue(currentGhost);
-          clearSuggestionState(input);
-        }
-      });
-
-      input.addEventListener('keydown', (event) => {
-        const currentGhost = input._autocompleteGhost;
-        if (!currentGhost) return;
-
-        if (isUndoShortcut(event) && undoInputHistory(input)) {
-          event.preventDefault();
-          return;
-        }
-
-        if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && hasMultipleSuggestions(input)) {
-          event.preventDefault();
-          currentGhost.value = cycleSuggestion(input, event.key === 'ArrowDown' ? 1 : -1);
-          return;
-        }
-
-        if (event.key === 'Tab' && suggestionTarget === input && suggestion) {
-          event.preventDefault();
-          replaceInputValueWithSuggestion(input, suggestion);
-          clearGhostValue(currentGhost);
-          clearSuggestionState(input);
-        }
-      });
+      return true;
     }
 
-    input.addEventListener('blur', cleanupGhost, { once: true });
-  }
-
-  function attachOverlayEvents(input) {
-    if (wiredInputs.has(input)) return;
-    wiredInputs.add(input);
-
-    input.addEventListener('focus', () => {
-      pushInputSnapshot(input);
-      createOverlay(input);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-  }
-
-  function getEditableText(element) {
-    return (element.innerText || '').replace(/\u00a0/g, ' ');
-  }
-
-  function insertTextAtCursor(text) {
-    const selection = window.getSelection();
-    if (!selection || !selection.rangeCount) return false;
-
-    const inserted = typeof document.execCommand === 'function' &&
-      document.execCommand('insertText', false, text);
-    if (inserted) return true;
-
-    const range = selection.getRangeAt(0);
-    range.deleteContents();
-
-    const textNode = document.createTextNode(text);
-    range.insertNode(textNode);
-    range.setStartAfter(textNode);
-    range.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(range);
-
-    const editable = textNode.parentElement?.closest('[contenteditable=""], [contenteditable="true"]');
-    if (editable) {
-      editable.dispatchEvent(new InputEvent('input', {
-        inputType: 'insertText',
-        data: text,
+    acceptSuggestion(value) {
+      this.element.focus();
+      setFormControlValue(this.element, value);
+      this.element.setSelectionRange(value.length, value.length);
+      this.element.dispatchEvent(new InputEvent('input', {
+        inputType: 'insertReplacementText',
+        data: value,
         bubbles: true,
         cancelable: true
       }));
     }
-
-    return true;
   }
 
-  function replaceInputValueWithSuggestion(input, nextValue) {
-    input.focus();
-    setInputValue(input, nextValue);
-    const cursorPos = nextValue.length;
-    input.setSelectionRange(cursorPos, cursorPos);
-    input.dispatchEvent(new InputEvent('input', {
-      inputType: 'insertReplacementText',
-      data: nextValue,
-      bubbles: true,
-      cancelable: true
-    }));
+  class EditableAdapter extends BaseAdapter {
+    getValue() {
+      return (this.element.innerText || '').replace(/\u00a0/g, ' ');
+    }
+
+    getLastWord() {
+      const words = this.getValue().split(/\s+/);
+      return words[words.length - 1] || '';
+    }
+
+    createGhost() {
+      const ghost = document.createElement('div');
+      const style = getComputedStyle(this.element);
+
+      ghost.className = 'autocomplete-ghost';
+      ghost.setAttribute('aria-hidden', 'true');
+      ghost.style.position = 'absolute';
+      ghost.style.zIndex = '9999';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.whiteSpace = 'pre-wrap';
+      ghost.style.wordBreak = 'break-word';
+      ghost.style.font = style.font;
+      ghost.style.padding = style.padding;
+      ghost.style.margin = style.margin;
+      ghost.style.border = style.border;
+      ghost.style.lineHeight = style.lineHeight;
+
+      const rgb = style.color.match(/\d+/g);
+      if (rgb) {
+        ghost.style.color = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.3)`;
+      }
+
+      return ghost;
+    }
+
+    setGhostValue(ghost, value) {
+      ghost.textContent = value;
+    }
+
+    clearGhostValue(ghost) {
+      ghost.textContent = '';
+    }
+
+    createSuggestionList() {
+      return createSuggestionListElement();
+    }
+
+    tryExpandShortcut(shortcutText) {
+      const selection = window.getSelection();
+      if (!selection || !selection.rangeCount) {
+        return false;
+      }
+
+      const range = selection.getRangeAt(0);
+      const lastWord = this.getLastWord();
+      if (!lastWord || range.endContainer.nodeType !== Node.TEXT_NODE) {
+        return false;
+      }
+
+      const startOffset = range.endOffset - lastWord.length;
+      if (startOffset < 0) {
+        return false;
+      }
+
+      const replacementRange = document.createRange();
+      replacementRange.setStart(range.endContainer, startOffset);
+      replacementRange.setEnd(range.endContainer, range.endOffset);
+      selection.removeAllRanges();
+      selection.addRange(replacementRange);
+      this.element.focus();
+
+      const inserted = typeof document.execCommand === 'function' &&
+        document.execCommand('insertText', false, shortcutText);
+
+      if (!inserted) {
+        replacementRange.deleteContents();
+        const textNode = document.createTextNode(shortcutText);
+        replacementRange.insertNode(textNode);
+        replacementRange.setStartAfter(textNode);
+        replacementRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(replacementRange);
+        this.element.dispatchEvent(new InputEvent('input', {
+          inputType: 'insertReplacementText',
+          data: shortcutText,
+          bubbles: true,
+          cancelable: true
+        }));
+      }
+
+      return true;
+    }
+
+    acceptSuggestion(value) {
+      const selection = window.getSelection();
+      if (!selection) {
+        return;
+      }
+
+      const replacementRange = document.createRange();
+      replacementRange.selectNodeContents(this.element);
+      selection.removeAllRanges();
+      selection.addRange(replacementRange);
+      this.element.focus();
+
+      const inserted = typeof document.execCommand === 'function' &&
+        document.execCommand('insertText', false, value);
+
+      if (!inserted) {
+        this.element.textContent = value;
+        const range = document.createRange();
+        range.selectNodeContents(this.element);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        this.element.dispatchEvent(new InputEvent('input', {
+          inputType: 'insertReplacementText',
+          data: value,
+          bubbles: true,
+          cancelable: true
+        }));
+      }
+    }
   }
 
-  function replaceEditableValueWithSuggestion(element, nextValue) {
-    const selection = window.getSelection();
-    if (!selection) return;
-
-    const replacementRange = document.createRange();
-    replacementRange.selectNodeContents(element);
-    selection.removeAllRanges();
-    selection.addRange(replacementRange);
-    element.focus();
-
-    const inserted = typeof document.execCommand === 'function' &&
-      document.execCommand('insertText', false, nextValue);
-
-    if (inserted) return;
-
-    element.textContent = nextValue;
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
-    element.dispatchEvent(new InputEvent('input', {
-      inputType: 'insertReplacementText',
-      data: nextValue,
-      bubbles: true,
-      cancelable: true
-    }));
-  }
-
-  function createOverlayForEditable(element) {
-    if (element.dataset.hasHintOverlay === 'true' || !isSiteAllowed()) return;
-    element.dataset.hasHintOverlay = 'true';
-
-    const ghost = document.createElement('div');
-    ghost.className = 'autocomplete-ghost';
-    ghost.setAttribute('aria-hidden', 'true');
-    ghost.style.position = 'absolute';
-    ghost.style.zIndex = '9999';
-    ghost.style.pointerEvents = 'none';
-    ghost.style.whiteSpace = 'pre-wrap';
-    ghost.style.wordBreak = 'break-word';
-
-    const style = getComputedStyle(element);
-    ghost.style.font = style.font;
-    ghost.style.padding = style.padding;
-    ghost.style.margin = style.margin;
-    ghost.style.border = style.border;
-    ghost.style.lineHeight = style.lineHeight;
-
-    const rgb = style.color.match(/\d+/g);
-    if (rgb) {
-      ghost.style.color = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.3)`;
+  class FieldController {
+    constructor(adapter) {
+      this.adapter = adapter;
+      this.element = adapter.element;
+      this.ghost = null;
+      this.list = null;
+      this.originalStyles = null;
+      this.matches = [];
+      this.selectedIndex = 0;
+      this.handleInput = this.handleInput.bind(this);
+      this.handleKeyDown = this.handleKeyDown.bind(this);
+      this.handleBlur = this.handleBlur.bind(this);
+      this.handleWindowChange = this.handleWindowChange.bind(this);
+      this.bindPersistentHandlers();
     }
 
-    const parent = element.parentNode;
-    if (!parent) return;
-
-    parent.insertBefore(ghost, element);
-
-    const originalStyles = {
-      elementPosition: element.style.position,
-      elementZIndex: element.style.zIndex,
-      elementBackground: element.style.background,
-      elementBackgroundColor: element.style.backgroundColor,
-      parentPosition: parent.style.position
-    };
-
-    if (getComputedStyle(parent).position === 'static') {
-      parent.style.position = 'relative';
+    bindPersistentHandlers() {
+      this.element.addEventListener('focus', () => this.activate());
+      this.element.addEventListener('input', this.handleInput);
+      this.element.addEventListener('keydown', this.handleKeyDown);
+      this.element.addEventListener('blur', this.handleBlur);
     }
 
-    if (getComputedStyle(element).position === 'static') {
-      element.style.position = 'relative';
+    activate() {
+      if (!Shared.isSiteAllowed(hostname, settings.allowedSites)) {
+        this.deactivate();
+        return;
+      }
+
+      activeController = this;
+      this.ensureOverlay();
+      if (this.adapter.rememberSnapshot) {
+        this.adapter.rememberSnapshot();
+      }
+      this.handleInput();
     }
 
-    element.style.zIndex = '10000';
-    element.style.background = 'transparent';
-    element.style.backgroundColor = 'transparent';
+    deactivate() {
+      if (activeController === this) {
+        activeController = null;
+      }
 
-    function updateGhostPosition() {
-      if (!ghost.isConnected || !element.isConnected) return;
+      if (!this.ghost || !this.list) {
+        return;
+      }
 
-      const rect = element.getBoundingClientRect();
+      window.removeEventListener('scroll', this.handleWindowChange, true);
+      window.removeEventListener('resize', this.handleWindowChange);
+      this.element.removeEventListener('scroll', this.handleWindowChange);
+
+      if (this.ghost.parentNode) {
+        this.ghost.parentNode.removeChild(this.ghost);
+      }
+
+      if (this.list.parentNode) {
+        this.list.parentNode.removeChild(this.list);
+      }
+
+      this.adapter.restoreOverlayStyles(this.originalStyles);
+      this.ghost = null;
+      this.list = null;
+      this.matches = [];
+      this.selectedIndex = 0;
+    }
+
+    ensureOverlay() {
+      if (this.ghost && this.list) {
+        this.updatePosition();
+        return;
+      }
+
+      const parent = this.adapter.getParent();
+      if (!parent) {
+        return;
+      }
+
+      this.originalStyles = this.adapter.applyOverlayStyles();
+      this.ghost = this.adapter.createGhost();
+      this.list = this.adapter.createSuggestionList();
+
+      parent.insertBefore(this.ghost, this.element);
+      parent.insertBefore(this.list, this.element.nextSibling);
+
+      window.addEventListener('scroll', this.handleWindowChange, true);
+      window.addEventListener('resize', this.handleWindowChange);
+      this.element.addEventListener('scroll', this.handleWindowChange);
+      this.updatePosition();
+    }
+
+    refresh() {
+      if (!this.adapter.isFocused()) {
+        return;
+      }
+
+      if (!Shared.isSiteAllowed(hostname, settings.allowedSites)) {
+        this.deactivate();
+        return;
+      }
+
+      this.ensureOverlay();
+      this.handleInput();
+    }
+
+    handleWindowChange() {
+      this.updatePosition();
+    }
+
+    updatePosition() {
+      if (!this.ghost || !this.list) {
+        return;
+      }
+
+      const parent = this.adapter.getParent();
+      if (!parent) {
+        return;
+      }
+
+      const rect = this.element.getBoundingClientRect();
       const parentRect = parent.getBoundingClientRect();
-      ghost.style.top = `${rect.top - parentRect.top + parent.scrollTop}px`;
-      ghost.style.left = `${rect.left - parentRect.left + parent.scrollLeft}px`;
-      ghost.style.width = `${rect.width}px`;
-      ghost.style.height = `${rect.height}px`;
+      const top = rect.top - parentRect.top + parent.scrollTop;
+      const left = rect.left - parentRect.left + parent.scrollLeft;
+
+      this.ghost.style.top = `${top}px`;
+      this.ghost.style.left = `${left}px`;
+      this.ghost.style.width = `${rect.width}px`;
+      this.ghost.style.height = `${rect.height}px`;
+
+      this.list.style.top = `${top + rect.height + 4}px`;
+      this.list.style.left = `${left}px`;
+      this.list.style.width = `${Math.max(rect.width, 220)}px`;
     }
 
-    function cleanupGhost() {
-      if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
-      window.removeEventListener('scroll', updateGhostPosition, true);
-      window.removeEventListener('resize', updateGhostPosition);
-      element.removeEventListener('scroll', updateGhostPosition);
+    handleInput() {
+      if (!this.ghost || !this.list) {
+        return;
+      }
 
-      element.style.position = originalStyles.elementPosition;
-      element.style.zIndex = originalStyles.elementZIndex;
-      element.style.background = originalStyles.elementBackground;
-      element.style.backgroundColor = originalStyles.elementBackgroundColor;
-      parent.style.position = originalStyles.parentPosition;
+      this.updatePosition();
+      const value = this.adapter.getValue();
+      const lastWord = this.adapter.getLastWord();
+      const shortcutText = Shared.findShortcutExpansion(settings.shortcuts, lastWord, settings.triggerCharacter);
 
-      element.dataset.hasHintOverlay = '';
-      element._autocompleteGhost = null;
-      element._autocompleteUpdateGhostPosition = null;
-      clearSuggestionState();
+      if (shortcutText && this.adapter.tryExpandShortcut(shortcutText)) {
+        this.clearSuggestions();
+        return;
+      }
+
+      if (this.adapter.rememberSnapshot) {
+        this.adapter.rememberSnapshot();
+      }
+
+      if (!value.trim()) {
+        this.clearSuggestions();
+        return;
+      }
+
+      const matches = Shared.getSentenceMatches(settings.sentences, value)
+        .filter((match) => Shared.normalize(match) !== Shared.normalize(value));
+
+      this.setMatches(matches);
     }
 
-    element._autocompleteCleanup = cleanupGhost;
-    element._autocompleteGhost = ghost;
-    element._autocompleteUpdateGhostPosition = updateGhostPosition;
+    handleKeyDown(event) {
+      if (!this.ghost || !this.list) {
+        return;
+      }
 
-    updateGhostPosition();
-    window.addEventListener('scroll', updateGhostPosition, true);
-    window.addEventListener('resize', updateGhostPosition);
-    element.addEventListener('scroll', updateGhostPosition);
+      if (event.key === 'ArrowDown' && this.matches.length > 1) {
+        event.preventDefault();
+        this.selectOffset(1);
+        return;
+      }
 
-    if (!element._autocompleteHandlersAttached) {
-      element._autocompleteHandlersAttached = true;
+      if (event.key === 'ArrowUp' && this.matches.length > 1) {
+        event.preventDefault();
+        this.selectOffset(-1);
+        return;
+      }
 
-      element.addEventListener('input', () => {
-        const currentGhost = element._autocompleteGhost;
-        if (!currentGhost) return;
+      if (this.adapter.undo && isUndoShortcut(event) && this.adapter.undo()) {
+        event.preventDefault();
+        return;
+      }
 
-        if (!isSiteAllowed()) {
-          clearGhostValue(currentGhost);
-          clearSuggestionState();
+      if (event.key === settings.acceptKey && this.getSelectedSuggestion()) {
+        if (event.key === 'Enter' && (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey)) {
           return;
         }
 
-        element._autocompleteUpdateGhostPosition?.();
-        const value = getEditableText(element);
+        event.preventDefault();
+        this.adapter.acceptSuggestion(this.getSelectedSuggestion());
+        this.clearSuggestions();
+      }
+    }
 
-        if (!value.trim()) {
-          clearGhostValue(currentGhost);
-          clearSuggestionState(element);
-          return;
+    handleBlur() {
+      window.setTimeout(() => {
+        if (document.activeElement !== this.element) {
+          this.deactivate();
         }
+      }, 0);
+    }
 
-        const words = value.split(/\s+/);
-        const lastWord = words[words.length - 1];
-        const fullText = findShortcutExpansion(lastWord);
+    setMatches(matches) {
+      this.matches = matches;
+      this.selectedIndex = 0;
+      this.renderSuggestions();
+    }
 
-        if (fullText) {
-          const selection = window.getSelection();
-          if (selection && selection.rangeCount) {
-            const range = selection.getRangeAt(0);
+    clearSuggestions() {
+      this.matches = [];
+      this.selectedIndex = 0;
+      this.renderSuggestions();
+    }
 
-            if (range.endContainer.nodeType === Node.TEXT_NODE) {
-              const startOffset = range.endOffset - lastWord.length;
-              if (startOffset >= 0) {
-                const replacementRange = document.createRange();
-                replacementRange.setStart(range.endContainer, startOffset);
-                replacementRange.setEnd(range.endContainer, range.endOffset);
-                selection.removeAllRanges();
-                selection.addRange(replacementRange);
-                element.focus();
+    getSelectedSuggestion() {
+      return this.matches[this.selectedIndex] || '';
+    }
 
-                const inserted = typeof document.execCommand === 'function' &&
-                  document.execCommand('insertText', false, fullText);
+    selectOffset(direction) {
+      if (!this.matches.length) {
+        return;
+      }
 
-                if (!inserted) {
-                  replacementRange.deleteContents();
-                  const textNode = document.createTextNode(fullText);
-                  replacementRange.insertNode(textNode);
-                  replacementRange.setStartAfter(textNode);
-                  replacementRange.collapse(true);
-                  selection.removeAllRanges();
-                  selection.addRange(replacementRange);
-                  element.dispatchEvent(new InputEvent('input', {
-                    inputType: 'insertReplacementText',
-                    data: fullText,
-                    bubbles: true,
-                    cancelable: true
-                  }));
-                }
+      this.selectedIndex = (this.selectedIndex + direction + this.matches.length) % this.matches.length;
+      this.renderSuggestions();
+    }
 
-                clearGhostValue(currentGhost);
-                clearSuggestionState(element);
-                return;
-              }
-            }
-          }
-        }
+    renderSuggestions() {
+      if (!this.ghost || !this.list) {
+        return;
+      }
 
-        const matches = getSentenceMatches(value).filter(match => normalize(match) !== normalize(value));
-        if (matches.length > 0) {
-          setSuggestionMatches(element, matches);
-          currentGhost.textContent = suggestion;
-        } else {
-          clearGhostValue(currentGhost);
-          clearSuggestionState(element);
-        }
+      const selectedSuggestion = this.getSelectedSuggestion();
+      if (selectedSuggestion) {
+        this.adapter.setGhostValue(this.ghost, selectedSuggestion);
+      } else {
+        this.adapter.clearGhostValue(this.ghost);
+      }
+
+      this.list.innerHTML = '';
+      if (!this.matches.length) {
+        this.list.hidden = true;
+        this.list.style.display = 'none';
+        return;
+      }
+
+      const startIndex = Math.max(
+        0,
+        Math.min(
+          this.selectedIndex,
+          this.matches.length - MAX_VISIBLE_SUGGESTIONS
+        )
+      );
+      const visibleMatches = this.matches.slice(startIndex, startIndex + MAX_VISIBLE_SUGGESTIONS);
+
+      visibleMatches.forEach((match, visibleIndex) => {
+        const actualIndex = startIndex + visibleIndex;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'autocomplete-item';
+        button.textContent = match;
+        button.dataset.selected = actualIndex === this.selectedIndex ? 'true' : 'false';
+        button.style.padding = '8px 10px';
+        button.style.border = '0';
+        button.style.borderRadius = '8px';
+        button.style.textAlign = 'left';
+        button.style.whiteSpace = 'pre-wrap';
+        button.style.wordBreak = 'break-word';
+        button.style.cursor = 'pointer';
+        button.style.background = actualIndex === this.selectedIndex
+          ? 'rgba(15, 118, 110, 0.12)'
+          : 'transparent';
+        button.style.color = '#0f172a';
+        button.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+          this.selectedIndex = actualIndex;
+          this.adapter.acceptSuggestion(match);
+          this.clearSuggestions();
+        });
+        this.list.appendChild(button);
       });
 
-      element.addEventListener('keydown', (event) => {
-        const currentGhost = element._autocompleteGhost;
-        if (!currentGhost) return;
-
-        if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && hasMultipleSuggestions(element)) {
-          event.preventDefault();
-          currentGhost.textContent = cycleSuggestion(element, event.key === 'ArrowDown' ? 1 : -1);
-          return;
-        }
-
-        if (event.key === 'Tab' && suggestionTarget === element && suggestion) {
-          event.preventDefault();
-          replaceEditableValueWithSuggestion(element, suggestion);
-          clearGhostValue(currentGhost);
-          clearSuggestionState(element);
-        }
-      });
+      this.list.hidden = false;
+      this.list.style.display = 'flex';
     }
-
-    element.addEventListener('blur', cleanupGhost, { once: true });
   }
 
-  function attachOverlayEventsForEditable(element) {
-    if (wiredEditables.has(element)) return;
-    wiredEditables.add(element);
+  function createSuggestionListElement() {
+    const list = document.createElement('div');
+    list.className = 'autocomplete-list';
+    list.hidden = true;
+    list.style.position = 'absolute';
+    list.style.zIndex = '10001';
+    list.style.display = 'none';
+    list.style.flexDirection = 'column';
+    list.style.gap = '2px';
+    list.style.padding = '4px';
+    list.style.background = '#ffffff';
+    list.style.border = '1px solid rgba(15, 23, 42, 0.15)';
+    list.style.borderRadius = '10px';
+    list.style.boxShadow = '0 10px 30px rgba(15, 23, 42, 0.14)';
+    list.style.maxHeight = '180px';
+    list.style.overflowY = 'auto';
 
-    element.addEventListener('focus', () => {
-      createOverlayForEditable(element);
-      element.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+    return list;
+  }
+
+  function setFormControlValue(element, value) {
+    const prototype = element instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+
+    if (descriptor?.set) {
+      descriptor.set.call(element, value);
+    } else {
+      element.value = value;
+    }
+  }
+
+  function isUndoShortcut(event) {
+    return (event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'z';
   }
 
   document.addEventListener('focusin', (event) => {
     const element = event.target;
 
-    if (!isSiteAllowed()) {
-      clearSuggestionState();
-      return;
-    }
-
-    if (isSupportedInput(element)) {
-      attachOverlayEvents(element);
-      if (document.activeElement === element) {
-        createOverlay(element);
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-      return;
-    }
-
-    if (element?.isContentEditable) {
-      attachOverlayEventsForEditable(element);
-      if (document.activeElement === element) {
-        createOverlayForEditable(element);
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-      }
+    if (isSupportedInput(element) || isSupportedEditable(element)) {
+      getController(element).activate();
     }
   });
-}
 
-chrome.storage.sync.get(['sentences', 'allowedSites', 'shortcuts', 'triggerCharacter'], (result) => {
-  applySettings(result);
-  activateAutocomplete();
-});
+  settingsStore.get((nextSettings) => {
+    settings = nextSettings;
+    refreshActiveController();
+  });
 
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== 'sync') {
-    return;
-  }
-
-  const nextSettings = {};
-  for (const [key, change] of Object.entries(changes)) {
-    nextSettings[key] = change.newValue;
-  }
-
-  applySettings(nextSettings);
-  triggerActiveElementRefresh();
-});
+  settingsStore.watch((partialSettings) => {
+    settings = Shared.normalizeSettings({ ...settings, ...partialSettings });
+    refreshActiveController();
+  });
+})();

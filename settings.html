@@ -1,135 +1,226 @@
 <!DOCTYPE html>
-<html lang="tr">
-
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Uzantı Ayarları</title>
+  <title data-i18n="settingsPageTitle">Extension Settings</title>
   <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --text: #1f2937;
+      --muted: #546071;
+      --accent: #0f766e;
+      --accent-strong: #115e59;
+      --border: rgba(15, 23, 42, 0.12);
+      --danger: #b91c1c;
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      margin: 30px auto;
-      max-width: 500px;
-      color: #333;
+      margin: 0;
+      font: 15px/1.5 "Segoe UI", Tahoma, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(14, 165, 233, 0.15), transparent 32%),
+        linear-gradient(180deg, #fbfdff 0%, var(--bg) 100%);
     }
 
-    h2 {
-      margin-bottom: 10px;
-      color: #444;
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
     }
 
-    .input-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-bottom: 20px;
+    header {
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+    }
+
+    .subtle {
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+      padding: 18px;
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
     }
 
     input[type="text"],
-    textarea {
-      padding: 8px;
-      font-size: 14px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-
-    input[type="text"] {
-      flex: 1;
-    }
-
-    textarea {
+    textarea,
+    select {
       width: 100%;
+      padding: 10px 12px;
+      font: inherit;
+      color: inherit;
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-sizing: border-box;
+    }
+
+    textarea {
+      min-height: 92px;
       resize: vertical;
     }
 
-    #shortcutKey {
-      width: 120px;
-      flex: unset;
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      margin-bottom: 14px;
+    }
+
+    .row > * {
+      flex: 1;
+    }
+
+    .row button {
+      flex: 0 0 auto;
     }
 
     button {
-      padding: 8px 14px;
-      font-size: 14px;
-      background-color: #007bff;
+      padding: 10px 12px;
+      font: inherit;
       color: white;
-      border: none;
-      border-radius: 4px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+      border: 0;
+      border-radius: 12px;
       cursor: pointer;
     }
 
-    button:hover {
-      background-color: #0056b3;
+    button.danger {
+      background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
     }
 
     ul {
       list-style: none;
+      margin: 0;
       padding: 0;
-    }
-
-    li {
-      background: #f1f1f1;
-      padding: 8px 12px;
-      margin-bottom: 6px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-radius: 4px;
-    }
-
-    .remove-btn {
-      background-color: #dc3545;
-      padding: 4px 10px;
-      font-size: 12px;
-      border: none;
-      color: white;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .remove-btn:hover {
-      background-color: #a71d2a;
-    }
-
-    .column-group {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      margin-bottom: 20px;
     }
 
-    .column-group input[type="text"] {
-      width: 200px;
+    li {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 10px 12px;
+      background: var(--surface-soft);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      border-radius: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .remove-btn {
+      flex: 0 0 auto;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: rgba(185, 28, 28, 0.1);
+      color: var(--danger);
+    }
+
+    .helper {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 14px;
     }
   </style>
 </head>
-
 <body>
-  <h2>İzin Verilen Siteler</h2>
-  <div class="input-group">
-    <input type="text" id="allowedInput" placeholder="ör. google.com">
-    <button id="addAllowedBtn">Ekle</button>
-  </div>
-  <ul id="allowedList"></ul>
+  <main>
+    <header>
+      <h1 data-i18n="settingsPageTitle">Extension Settings</h1>
+      <p class="subtle" data-i18n="settingsHelperText">Use a trigger character for shortcuts. Suggestions can be switched with Arrow Up/Down and accepted with your selected key.</p>
+    </header>
 
-  <div class="input-group column-group">
-    <h2>Kısayollar (Keyword → Cümle)</h2>
-    <div class="input-group column-group">
-      <input type="text" id="shortcutKey" placeholder="anahtar">
-      <textarea id="shortcutValue" rows="2" placeholder="Eklemek istediğiniz metni girin."></textarea>
-      <button id="addShortcutBtn">Ekle</button>
+    <div class="layout">
+      <section class="card">
+        <h2 data-i18n="allowedSitesTitle">Allowed Sites</h2>
+        <p class="helper" data-i18n="allowedSitesHelper">Leave this list empty to enable the extension on all sites.</p>
+        <div class="row">
+          <div>
+            <label for="allowedInput" data-i18n="allowedSiteLabel">Site domain</label>
+            <input type="text" id="allowedInput" data-i18n-placeholder="allowedSitePlaceholder">
+          </div>
+          <button id="addAllowedBtn" data-i18n="addButton">Add</button>
+        </div>
+        <ul id="allowedList"></ul>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="shortcutSettingsTitle">Shortcut Snippets</h2>
+        <p class="helper" data-i18n="shortcutHelper">Type the trigger character and key in the page to expand the saved text.</p>
+        <div class="row">
+          <div>
+            <label for="shortcutKey" data-i18n="shortcutKeyLabel">Shortcut key</label>
+            <input type="text" id="shortcutKey" data-i18n-placeholder="shortcutKeyPlaceholder">
+          </div>
+          <div>
+            <label for="shortcutValue" data-i18n="shortcutValueLabel">Shortcut text</label>
+            <textarea id="shortcutValue" data-i18n-placeholder="shortcutValuePlaceholder"></textarea>
+          </div>
+        </div>
+        <button id="addShortcutBtn" data-i18n="addShortcutButton">Add Shortcut</button>
+        <ul id="shortcutList" style="margin-top: 14px;"></ul>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="typingBehaviorTitle">Typing Behavior</h2>
+        <div class="row">
+          <div>
+            <label for="triggerCharacter" data-i18n="triggerCharacterLabel">Trigger character</label>
+            <input type="text" id="triggerCharacter" maxlength="1">
+          </div>
+          <div>
+            <label for="acceptKey" data-i18n="acceptKeyLabel">Accept key</label>
+            <select id="acceptKey">
+              <option value="Tab" data-i18n="acceptKeyTab">Tab</option>
+              <option value="Enter" data-i18n="acceptKeyEnter">Enter</option>
+              <option value="ArrowRight" data-i18n="acceptKeyArrowRight">Right Arrow</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="dangerZoneTitle">Danger Zone</h2>
+        <p class="helper" data-i18n="clearDataHelper">Remove all saved texts, allowed sites, shortcuts, and typing preferences.</p>
+        <button id="clearDataBtn" class="danger" data-i18n="clearDataButton">Clear Everything</button>
+      </section>
     </div>
-    <ul id="shortcutList"></ul>
-  </div>
-  <div class="input-group">
-      <h3>Kısayol karakteri:</h3>
-      <input type="text" id="triggerCharacter" maxlength="1">
-  </div>  
+  </main>
 
-  <div class="input-group" style="margin-top: 20px;">
-    <h3>Tüm Verileri Temizle</h3>
-    <button id="clearDataBtn" style="background-color: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">Temizle</button>
-  </div>
-
+  <script src="shared.js"></script>
   <script src="settings.js"></script>
 </body>
-
 </html>
