@@ -222,8 +222,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 chrome.permissions.onAdded.addListener(() => {
-  finalizePendingSiteEnable();
-  syncExtensionState();
+  void (async () => {
+    await finalizePendingSiteEnable();
+    await syncExtensionState();
+  })();
 });
 
 chrome.permissions.onRemoved.addListener(() => {

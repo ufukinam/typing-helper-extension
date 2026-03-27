@@ -203,12 +203,14 @@ toggleSiteBtn.addEventListener('click', () => {
       return;
     }
 
-    settingsStore.set({ allowedSites: nextAllowedSites }, (nextSettings) => {
-      settings = nextSettings;
-      void renderCurrentSite();
+    await new Promise((resolve) => {
+      settingsStore.set({ allowedSites: nextAllowedSites }, (nextSettings) => {
+        settings = nextSettings;
+        resolve();
+      });
     });
   })().finally(() => {
-    toggleSiteBtn.disabled = false;
+    void renderCurrentSite();
   });
 });
 
