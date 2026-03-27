@@ -1,12 +1,12 @@
 {
   "extensionName": {
-    "message": "Metin Tamamlayıcı"
+    "message": "FinishMyText"
   },
   "extensionDescription": {
     "message": "Kayıtlı metinleri ve kısayol metinlerini yazarken otomatik tamamlama ile kullanın."
   },
   "popupTitle": {
-    "message": "Metin Tamamlayıcı"
+    "message": "FinishMyText"
   },
   "savedTextsTitle": {
     "message": "Kayıtlı Metinler"

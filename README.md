@@ -1,4 +1,4 @@
-# Text Completer
+# FinishMyText
 
 Chrome extension for inserting saved texts and shortcut snippets while typing.
 

@@ -1,12 +1,12 @@
 {
   "extensionName": {
-    "message": "Text Completer"
+    "message": "FinishMyText"
   },
   "extensionDescription": {
     "message": "Autocomplete saved texts and shortcut snippets while typing."
   },
   "popupTitle": {
-    "message": "Text Completer"
+    "message": "FinishMyText"
   },
   "savedTextsTitle": {
     "message": "Saved Texts"

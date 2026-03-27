@@ -11,9 +11,9 @@
   };
   const MESSAGE_CATALOGS = {
     en: {
-      extensionName: 'Text Completer',
+      extensionName: 'FinishMyText',
       extensionDescription: 'Autocomplete saved texts and shortcut snippets while typing.',
-      popupTitle: 'Text Completer',
+      popupTitle: 'FinishMyText',
       savedTextsTitle: 'Saved Texts',
       sentencePlaceholder: 'Enter the text you want to save.',
       addTextButton: 'Add Text',
@@ -70,9 +70,9 @@
       sitePermissionDeniedAlert: 'Chrome site access was not granted for this site.'
     },
     tr: {
-      extensionName: 'Metin Tamamlayıcı',
+      extensionName: 'FinishMyText',
       extensionDescription: 'Kayıtlı metinleri ve kısayol metinlerini yazarken otomatik tamamlama ile kullanın.',
-      popupTitle: 'Metin Tamamlayıcı',
+      popupTitle: 'FinishMyText',
       savedTextsTitle: 'Kayıtlı Metinler',
       sentencePlaceholder: 'Kaydetmek istediğiniz metni girin.',
       addTextButton: 'Metin Ekle',
