@@ -4,6 +4,7 @@ const Shared = globalThis.TypingHelperShared;
 const settingsStore = Shared.createSettingsStore(chrome.storage.sync);
 const SAVE_SELECTION_MENU_ID = 'save-selected-text';
 const SCRIPT_FILES = ['shared.js', 'content.js'];
+const PENDING_SITE_ENABLE_KEY = 'pendingSiteEnableDomain';
 let contextMenuSyncToken = 0;
 
 function containsOrigins(origins) {
@@ -21,6 +22,24 @@ function queryTabs(queryInfo) {
 function getSettings() {
   return new Promise((resolve) => {
     settingsStore.get(resolve);
+  });
+}
+
+function getLocalValue(key) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([key], (result) => resolve(result[key]));
+  });
+}
+
+function setLocalValue(patch) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set(patch, () => resolve());
+  });
+}
+
+function removeLocalValue(key) {
+  return new Promise((resolve) => {
+    chrome.storage.local.remove(key, () => resolve());
   });
 }
 
@@ -129,6 +148,56 @@ function saveSelectedText(selectionText) {
   });
 }
 
+async function setPendingSiteEnable(domain) {
+  const normalizedDomain = Shared.normalizeDomain(domain);
+  if (!normalizedDomain) {
+    await removeLocalValue(PENDING_SITE_ENABLE_KEY);
+    return '';
+  }
+
+  await setLocalValue({ [PENDING_SITE_ENABLE_KEY]: normalizedDomain });
+  return normalizedDomain;
+}
+
+async function clearPendingSiteEnable() {
+  await removeLocalValue(PENDING_SITE_ENABLE_KEY);
+}
+
+async function addAllowedSite(domain) {
+  const normalizedDomain = Shared.normalizeDomain(domain);
+  if (!normalizedDomain) {
+    return { ok: false };
+  }
+
+  const settings = await getSettings();
+  if (settings.allowedSites.includes(normalizedDomain)) {
+    await clearPendingSiteEnable();
+    return { ok: true, settings };
+  }
+
+  return new Promise((resolve) => {
+    settingsStore.set({
+      allowedSites: [...settings.allowedSites, normalizedDomain]
+    }, async (nextSettings) => {
+      await clearPendingSiteEnable();
+      resolve({ ok: true, settings: nextSettings });
+    });
+  });
+}
+
+async function finalizePendingSiteEnable() {
+  const pendingDomain = await getLocalValue(PENDING_SITE_ENABLE_KEY);
+  if (!pendingDomain) {
+    return { ok: false };
+  }
+
+  if (!(await containsOrigins(Shared.getHostPermissionPatterns(pendingDomain)))) {
+    return { ok: false };
+  }
+
+  return addAllowedSite(pendingDomain);
+}
+
 async function syncExtensionState() {
   const settings = await syncAllowedSitesWithPermissions();
   Shared.setLanguagePreference(settings.language);
@@ -153,6 +222,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 chrome.permissions.onAdded.addListener(() => {
+  finalizePendingSiteEnable();
   syncExtensionState();
 });
 
@@ -166,6 +236,34 @@ chrome.contextMenus.onClicked.addListener((info) => {
   }
 
   saveSelectedText(info.selectionText);
+});
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === 'prepare-enable-site') {
+    void (async () => {
+      const domain = await setPendingSiteEnable(message.domain);
+      sendResponse({ ok: Boolean(domain), domain });
+    })();
+    return true;
+  }
+
+  if (message?.type === 'clear-pending-enable-site') {
+    void (async () => {
+      await clearPendingSiteEnable();
+      sendResponse({ ok: true });
+    })();
+    return true;
+  }
+
+  if (message?.type === 'finalize-enable-site') {
+    void (async () => {
+      const result = await addAllowedSite(message.domain);
+      sendResponse(result);
+    })();
+    return true;
+  }
+
+  return false;
 });
 
 settingsStore.watch((settings) => {

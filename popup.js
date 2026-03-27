@@ -158,6 +158,8 @@ toggleSiteBtn.addEventListener('click', () => {
     return;
   }
 
+  toggleSiteBtn.disabled = true;
+
   void (async () => {
     const matchedRule = Shared.findAllowedSiteMatch(currentDomain, settings.allowedSites);
     const hasExactRule = settings.allowedSites.includes(currentDomain);
@@ -167,19 +169,37 @@ toggleSiteBtn.addEventListener('click', () => {
     let nextAllowedSites;
 
     if (!matchedRule || !permissionGranted) {
+      await chrome.runtime.sendMessage({
+        type: 'prepare-enable-site',
+        domain: currentDomain
+      });
+
       const granted = await requestOrigins(Shared.getHostPermissionPatterns(currentDomain));
       if (!granted) {
+        await chrome.runtime.sendMessage({
+          type: 'clear-pending-enable-site'
+        });
+        await renderCurrentSite();
         alert(Shared.getMessage('sitePermissionDeniedAlert'));
         return;
       }
 
-      nextAllowedSites = settings.allowedSites.includes(currentDomain)
-        ? settings.allowedSites
-        : [...settings.allowedSites, currentDomain];
+      const response = await chrome.runtime.sendMessage({
+        type: 'finalize-enable-site',
+        domain: currentDomain
+      });
+
+      if (response?.settings) {
+        settings = response.settings;
+      }
+
+      await renderCurrentSite();
+      return;
     } else if (hasExactRule) {
       await removeOrigins(Shared.getHostPermissionPatterns(currentDomain));
       nextAllowedSites = settings.allowedSites.filter((site) => site !== currentDomain);
     } else {
+      await renderCurrentSite();
       return;
     }
 
@@ -187,7 +207,9 @@ toggleSiteBtn.addEventListener('click', () => {
       settings = nextSettings;
       void renderCurrentSite();
     });
-  })();
+  })().finally(() => {
+    toggleSiteBtn.disabled = false;
+  });
 });
 
 openSettingsBtn.addEventListener('click', () => {
